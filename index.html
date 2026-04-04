@@ -35,6 +35,12 @@
             --purple: #7c3aed;
             --purple-bg: #f5f3ff;
             --purple-border: #ddd6fe;
+            --teal: #0d9488;
+            --teal-bg: #f0fdfa;
+            --teal-border: #99f6e4;
+            --pink: #db2777;
+            --pink-bg: #fdf2f8;
+            --pink-border: #fbcfe8;
             --radius: 16px;
             --radius-sm: 10px;
             --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
@@ -76,7 +82,7 @@
         /* Summary */
         .summary {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 0.75rem;
             margin-bottom: 2.5rem;
         }
@@ -139,6 +145,8 @@
         .section-icon.blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
         .section-icon.purple { background: var(--purple-bg); color: var(--purple); border: 1px solid var(--purple-border); }
         .section-icon.red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+        .section-icon.teal { background: var(--teal-bg); color: var(--teal); border: 1px solid var(--teal-border); }
+        .section-icon.pink { background: var(--pink-bg); color: var(--pink); border: 1px solid var(--pink-border); }
 
         .section-title {
             font-size: 0.95rem;
@@ -270,6 +278,8 @@
         .result-box.blue-tint { background: var(--blue-bg); border-color: var(--blue-border); }
         .result-box.amber-tint { background: var(--amber-bg); border-color: var(--amber-border); }
         .result-box.purple-tint { background: var(--purple-bg); border-color: var(--purple-border); }
+        .result-box.teal-tint { background: var(--teal-bg); border-color: var(--teal-border); }
+        .result-box.pink-tint { background: var(--pink-bg); border-color: var(--pink-border); }
         .result-box.neutral { background: var(--bg-result); }
 
         .result-label {
@@ -287,6 +297,8 @@
         .result-value.blue { color: var(--blue); }
         .result-value.amber { color: var(--amber); }
         .result-value.purple { color: var(--purple); }
+        .result-value.teal { color: var(--teal); }
+        .result-value.pink { color: var(--pink); }
         .result-value.auto-positive { color: var(--green); }
         .result-value.auto-negative { color: var(--red); }
         .result-value.auto-zero { color: var(--text-muted); }
@@ -312,6 +324,7 @@
         @media (max-width: 700px) {
             .app { padding: 1.5rem 1rem 3rem; }
             .summary { grid-template-columns: repeat(2, 1fr); }
+            .summary-value { font-size: 1rem; }
             .calc-grid { grid-template-columns: 1fr; }
             .opex-grid { grid-template-columns: 1fr; }
             .input-row { flex-direction: column; align-items: stretch; gap: 0.3rem; }
@@ -337,20 +350,36 @@
             <div class="summary-value" id="sum-receita">R$ 0</div>
         </div>
         <div class="summary-card">
-            <div class="summary-label">Lucro Bruto</div>
-            <div class="summary-value" id="sum-lucro-bruto">R$ 0</div>
+            <div class="summary-label">Ticket Medio</div>
+            <div class="summary-value" id="sum-ticket">R$ 0</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">CMV %</div>
+            <div class="summary-value" id="sum-cmv-pct">0%</div>
         </div>
         <div class="summary-card">
             <div class="summary-label">Margem Bruta</div>
             <div class="summary-value" id="sum-margem-bruta">0%</div>
         </div>
         <div class="summary-card">
-            <div class="summary-label">Lucro Operacional</div>
-            <div class="summary-value" id="sum-lucro-op">R$ 0</div>
+            <div class="summary-label">OPEX %</div>
+            <div class="summary-value" id="sum-opex-pct">0%</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">Margem Operacional</div>
+            <div class="summary-value" id="sum-margem-op">0%</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">Margem Liquida</div>
+            <div class="summary-value" id="sum-margem-liq">0%</div>
         </div>
         <div class="summary-card">
             <div class="summary-label">Lucro Liquido</div>
             <div class="summary-value" id="sum-lucro-liq">R$ 0</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-label">CAC</div>
+            <div class="summary-value" id="sum-cac">R$ 0</div>
         </div>
         <div class="summary-card">
             <div class="summary-label">Break-even</div>
@@ -415,6 +444,43 @@
                         <div class="result-box red-tint">
                             <span class="result-label">CMV Total</span>
                             <span class="result-value red" id="res-cmv">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1.5 Ticket Medio -->
+        <div class="section-group">
+            <div class="section-header">
+                <div class="section-icon teal">$</div>
+                <div>
+                    <div class="section-title">Ticket Medio</div>
+                    <div class="section-subtitle">Valor medio por venda realizada</div>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="calc-grid">
+                    <div class="calc">
+                        <div class="calc-formula">Faturamento Total / N. de Vendas</div>
+                        <div class="inputs">
+                            <div class="input-row">
+                                <span class="input-label">Faturamento</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="ticket-faturamento" class="has-prefix" placeholder="Usa Receita se vazio" step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <span class="input-label">N. de vendas</span>
+                                <div class="input-wrap">
+                                    <input type="number" id="ticket-vendas" placeholder="0" step="1" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="result-box teal-tint">
+                            <span class="result-label">Ticket Medio</span>
+                            <span class="result-value teal" id="res-ticket">R$ 0,00</span>
                         </div>
                     </div>
                 </div>
@@ -563,10 +629,110 @@
             </div>
         </div>
 
-        <!-- 4. Resultado Final -->
+        <!-- 4. Marketing & Comercial + CAC -->
         <div class="section-group">
             <div class="section-header">
-                <div class="section-icon purple">4</div>
+                <div class="section-icon pink">4</div>
+                <div>
+                    <div class="section-title">Marketing & Comercial</div>
+                    <div class="section-subtitle">Investimento em aquisicao de clientes</div>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="calc-grid">
+                    <div class="calc">
+                        <div class="calc-title">Marketing</div>
+                        <div class="calc-desc">Custos com aquisicao de clientes via marketing.</div>
+                        <div class="inputs">
+                            <div class="input-row">
+                                <span class="input-label">Trafego pago</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="mkt-trafego" class="has-prefix" placeholder="Meta, Google, etc." step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <span class="input-label">Agencia</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="mkt-agencia" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <span class="input-label">Ferramentas</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="mkt-ferramentas" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="result-box pink-tint">
+                            <span class="result-label">Total Marketing</span>
+                            <span class="result-value pink" id="res-mkt-total">R$ 0,00</span>
+                        </div>
+                    </div>
+                    <div class="calc">
+                        <div class="calc-title">Comercial</div>
+                        <div class="calc-desc">Custos com equipe de vendas (se houver).</div>
+                        <div class="inputs">
+                            <div class="input-row">
+                                <span class="input-label">Closers</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="com-closers" class="has-prefix" placeholder="Salarios" step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <span class="input-label">Comissao</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="com-comissao" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <span class="input-label">SDRs</span>
+                                <div class="input-wrap">
+                                    <span class="input-prefix">R$</span>
+                                    <input type="number" id="com-sdrs" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="result-box pink-tint">
+                            <span class="result-label">Total Comercial</span>
+                            <span class="result-value pink" id="res-com-total">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="calc-divider" style="margin: 1.2rem 0;"></div>
+                <div class="calc">
+                    <div class="calc-title">CAC (Custo de Aquisicao de Cliente)</div>
+                    <div class="calc-formula">Investimento total em aquisicao / N. clientes adquiridos</div>
+                    <div class="inputs" style="max-width: 400px;">
+                        <div class="input-row">
+                            <span class="input-label">Clientes adquiridos</span>
+                            <div class="input-wrap">
+                                <input type="number" id="cac-clientes" placeholder="0" step="1" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="results-stack" style="max-width: 500px;">
+                        <div class="result-box pink-tint">
+                            <span class="result-label">Investimento Total (Mkt + Comercial)</span>
+                            <span class="result-value pink" id="res-invest-total">R$ 0,00</span>
+                        </div>
+                        <div class="result-box pink-tint">
+                            <span class="result-label">CAC</span>
+                            <span class="result-value pink" id="res-cac">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Resultado Final -->
+        <div class="section-group">
+            <div class="section-header">
+                <div class="section-icon purple">5</div>
                 <div>
                     <div class="section-title">Resultado Final</div>
                     <div class="section-subtitle">O que sobra depois de tudo</div>
@@ -625,10 +791,10 @@
             </div>
         </div>
 
-        <!-- 5. Break-even -->
+        <!-- 6. Break-even -->
         <div class="section-group">
             <div class="section-header">
-                <div class="section-icon red">5</div>
+                <div class="section-icon red">6</div>
                 <div>
                     <div class="section-title">Ponto de Equilibrio (Break-even)</div>
                     <div class="section-subtitle">Quanto precisa faturar para nao ter prejuizo</div>
@@ -699,16 +865,28 @@
     }
 
     function calculate() {
+        // 1. Receita
         const precoVenda = val('preco-venda');
         const qtd = val('quantidade-vendida');
         const receita = precoVenda * qtd;
         setText('res-receita', formatBRL(receita));
 
+        // 2. CMV
         const custoUnit = val('custo-unitario');
         const qtdCMV = val('quantidade-cmv');
         const cmv = custoUnit * qtdCMV;
         setText('res-cmv', formatBRL(cmv));
 
+        // CMV %
+        const cmvPct = receita > 0 ? (cmv / receita) * 100 : 0;
+
+        // Ticket Medio
+        const ticketFat = val('ticket-faturamento') || receita;
+        const ticketVendas = val('ticket-vendas');
+        const ticketMedio = ticketVendas > 0 ? ticketFat / ticketVendas : 0;
+        setText('res-ticket', formatBRL(ticketMedio));
+
+        // 3-4. Lucro Bruto & Margem Bruta
         const lucroBruto = receita - cmv;
         setText('res-lucro-bruto', formatBRL(lucroBruto));
         autoColor('res-lucro-bruto', lucroBruto);
@@ -716,14 +894,20 @@
         const margemBruta = receita > 0 ? ((receita - cmv) / receita) * 100 : 0;
         setText('res-margem-bruta', formatPct(margemBruta));
 
+        // 11. Markup
         const markup = custoUnit > 0 ? precoVenda / custoUnit : 0;
         const markupPct = custoUnit > 0 ? ((precoVenda - custoUnit) / custoUnit) * 100 : 0;
         setText('res-markup', markup.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x');
         setText('res-markup-pct', formatPct(markupPct));
 
+        // 5. OPEX
         const opex = val('opex-salarios') + val('opex-aluguel') + val('opex-marketing') + val('opex-outros');
         setText('res-opex', formatBRL(opex));
 
+        // OPEX %
+        const opexPct = receita > 0 ? (opex / receita) * 100 : 0;
+
+        // 6-7. Lucro & Margem Operacional
         const lucroOp = receita - cmv - opex;
         setText('res-lucro-op', formatBRL(lucroOp));
         autoColor('res-lucro-op', lucroOp);
@@ -731,10 +915,27 @@
         const margemOp = receita > 0 ? (lucroOp / receita) * 100 : 0;
         setText('res-margem-op', formatPct(margemOp));
 
+        // 8. CAPEX
         const capexValor = val('capex-valor');
         const capexMeses = val('capex-meses') || 1;
         setText('res-capex', formatBRL(capexValor / capexMeses));
 
+        // Marketing & Comercial
+        const mktTotal = val('mkt-trafego') + val('mkt-agencia') + val('mkt-ferramentas');
+        setText('res-mkt-total', formatBRL(mktTotal));
+
+        const comTotal = val('com-closers') + val('com-comissao') + val('com-sdrs');
+        setText('res-com-total', formatBRL(comTotal));
+
+        const investTotal = mktTotal + comTotal;
+        setText('res-invest-total', formatBRL(investTotal));
+
+        // CAC
+        const cacClientes = val('cac-clientes');
+        const cac = cacClientes > 0 ? investTotal / cacClientes : 0;
+        setText('res-cac', formatBRL(cac));
+
+        // 9-10. Lucro Liquido & Margem Liquida
         const impostos = val('impostos');
         const juros = val('juros');
         const lucroLiq = lucroOp - impostos - juros;
@@ -744,10 +945,12 @@
         const margemLiq = receita > 0 ? (lucroLiq / receita) * 100 : 0;
         setText('res-margem-liq', formatPct(margemLiq));
 
+        // 13. Sobra de Caixa
         const sobra = lucroLiq - val('distribuicao');
         setText('res-sobra', formatBRL(sobra));
         autoColor('res-sobra', sobra);
 
+        // 12. Break-even
         const custosFixos = val('custos-fixos') || opex;
         const mbDecimal = margemBruta / 100;
         const beSimples = mbDecimal > 0 ? custosFixos / mbDecimal : 0;
@@ -757,19 +960,23 @@
         const beCompleto = (1 - cmvRatio) > 0 ? custosFixos / (1 - cmvRatio) : 0;
         setText('res-breakeven-completo', formatBRL(beCompleto));
 
-        // Summary
+        // ---- Summary Dashboard ----
         setText('sum-receita', formatBRL(receita));
-        setText('sum-lucro-bruto', formatBRL(lucroBruto));
+        setText('sum-ticket', formatBRL(ticketMedio));
+        setText('sum-cmv-pct', formatPct(cmvPct));
         setText('sum-margem-bruta', formatPct(margemBruta));
-        setText('sum-lucro-op', formatBRL(lucroOp));
+        setText('sum-opex-pct', formatPct(opexPct));
+        setText('sum-margem-op', formatPct(margemOp));
+        setText('sum-margem-liq', formatPct(margemLiq));
         setText('sum-lucro-liq', formatBRL(lucroLiq));
+        setText('sum-cac', formatBRL(cac));
         setText('sum-breakeven', formatBRL(beSimples));
 
         summaryColor('sum-receita', receita);
-        summaryColor('sum-lucro-bruto', lucroBruto);
-        summaryColor('sum-margem-bruta', margemBruta);
-        summaryColor('sum-lucro-op', lucroOp);
         summaryColor('sum-lucro-liq', lucroLiq);
+        summaryColor('sum-margem-bruta', margemBruta);
+        summaryColor('sum-margem-op', margemOp);
+        summaryColor('sum-margem-liq', margemLiq);
     }
 
     document.querySelectorAll('input[type="number"]').forEach(el => {
