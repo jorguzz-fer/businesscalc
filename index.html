@@ -93,6 +93,13 @@
             padding: 1.1rem 1.2rem;
             box-shadow: var(--shadow-sm);
         }
+        .summary-card.sc-green { background: var(--green-bg); border-color: var(--green-border); }
+        .summary-card.sc-teal { background: var(--teal-bg); border-color: var(--teal-border); }
+        .summary-card.sc-red { background: var(--red-bg); border-color: var(--red-border); }
+        .summary-card.sc-amber { background: var(--amber-bg); border-color: var(--amber-border); }
+        .summary-card.sc-blue { background: var(--blue-bg); border-color: var(--blue-border); }
+        .summary-card.sc-purple { background: var(--purple-bg); border-color: var(--purple-border); }
+        .summary-card.sc-pink { background: var(--pink-bg); border-color: var(--pink-border); }
         .summary-label {
             font-size: 0.68rem;
             font-weight: 600;
@@ -119,7 +126,15 @@
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             overflow: hidden;
+            border-left: 3px solid var(--border);
         }
+        .section-group.sg-green { border-left-color: var(--green); }
+        .section-group.sg-teal { border-left-color: var(--teal); }
+        .section-group.sg-amber { border-left-color: var(--amber); }
+        .section-group.sg-blue { border-left-color: var(--blue); }
+        .section-group.sg-pink { border-left-color: var(--pink); }
+        .section-group.sg-purple { border-left-color: var(--purple); }
+        .section-group.sg-red { border-left-color: var(--red); }
 
         .section-header {
             display: flex;
@@ -346,43 +361,43 @@
 
     <!-- Summary -->
     <div class="summary">
-        <div class="summary-card">
+        <div class="summary-card sc-green">
             <div class="summary-label">Receita</div>
             <div class="summary-value" id="sum-receita">R$ 0</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-teal">
             <div class="summary-label">Ticket Medio</div>
             <div class="summary-value" id="sum-ticket">R$ 0</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-red">
             <div class="summary-label">CMV %</div>
             <div class="summary-value" id="sum-cmv-pct">0%</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-amber">
             <div class="summary-label">Margem Bruta</div>
             <div class="summary-value" id="sum-margem-bruta">0%</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-blue">
             <div class="summary-label">OPEX %</div>
             <div class="summary-value" id="sum-opex-pct">0%</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-blue">
             <div class="summary-label">Margem Operacional</div>
             <div class="summary-value" id="sum-margem-op">0%</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-purple">
             <div class="summary-label">Margem Liquida</div>
             <div class="summary-value" id="sum-margem-liq">0%</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-purple">
             <div class="summary-label">Lucro Liquido</div>
             <div class="summary-value" id="sum-lucro-liq">R$ 0</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-pink">
             <div class="summary-label">CAC</div>
             <div class="summary-value" id="sum-cac">R$ 0</div>
         </div>
-        <div class="summary-card">
+        <div class="summary-card sc-red">
             <div class="summary-label">Break-even</div>
             <div class="summary-value" id="sum-breakeven">R$ 0</div>
         </div>
@@ -391,7 +406,7 @@
     <div class="sections">
 
         <!-- 1. Receita & CMV -->
-        <div class="section-group">
+        <div class="section-group sg-green">
             <div class="section-header">
                 <div class="section-icon green">1</div>
                 <div>
@@ -452,7 +467,7 @@
         </div>
 
         <!-- 1.5 Ticket Medio -->
-        <div class="section-group">
+        <div class="section-group sg-teal">
             <div class="section-header">
                 <div class="section-icon teal">$</div>
                 <div>
@@ -489,7 +504,7 @@
         </div>
 
         <!-- 2. Margens & Markup -->
-        <div class="section-group">
+        <div class="section-group sg-amber">
             <div class="section-header">
                 <div class="section-icon amber">2</div>
                 <div>
@@ -534,7 +549,7 @@
         </div>
 
         <!-- 3. Operacional -->
-        <div class="section-group">
+        <div class="section-group sg-blue">
             <div class="section-header">
                 <div class="section-icon blue">3</div>
                 <div>
@@ -631,7 +646,7 @@
         </div>
 
         <!-- 4. Marketing & Comercial + CAC -->
-        <div class="section-group">
+        <div class="section-group sg-pink">
             <div class="section-header">
                 <div class="section-icon pink">4</div>
                 <div>
@@ -731,7 +746,7 @@
         </div>
 
         <!-- 5. Resultado Final -->
-        <div class="section-group">
+        <div class="section-group sg-purple">
             <div class="section-header">
                 <div class="section-icon purple">5</div>
                 <div>
@@ -793,7 +808,7 @@
         </div>
 
         <!-- 6. Break-even -->
-        <div class="section-group">
+        <div class="section-group sg-red">
             <div class="section-header">
                 <div class="section-icon red">6</div>
                 <div>
