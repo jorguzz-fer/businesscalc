@@ -259,7 +259,7 @@
             color: var(--text-muted);
             pointer-events: none;
         }
-        input[type="number"] {
+        input[type="number"], input[type="text"].money-input {
             width: 100%;
             background: var(--bg-input);
             border: 1.5px solid var(--border);
@@ -274,7 +274,7 @@
         }
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
-        input[type="number"]:focus {
+        input[type="number"]:focus, input[type="text"].money-input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
         }
@@ -424,7 +424,7 @@
                                 <span class="input-label">Preco de venda</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="preco-venda" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="preco-venda" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
@@ -447,7 +447,7 @@
                                 <span class="input-label">Custo unitario</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="custo-unitario" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="custo-unitario" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
@@ -484,7 +484,7 @@
                                 <span class="input-label">Faturamento</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="ticket-faturamento" class="has-prefix" placeholder="Usa Receita se vazio" step="0.01" min="0">
+                                    <input type="text" id="ticket-faturamento" class="has-prefix money-input" placeholder="Usa Receita se vazio" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
@@ -568,28 +568,28 @@
                                 <span class="input-label">Salarios</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="opex-salarios" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="opex-salarios" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Aluguel</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="opex-aluguel" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="opex-aluguel" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Marketing</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="opex-marketing" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="opex-marketing" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Outros custos</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="opex-outros" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="opex-outros" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -625,7 +625,7 @@
                                     <span class="input-label">Investimento</span>
                                     <div class="input-wrap">
                                         <span class="input-prefix">R$</span>
-                                        <input type="number" id="capex-valor" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                        <input type="text" id="capex-valor" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                     </div>
                                 </div>
                                 <div class="input-row">
@@ -664,21 +664,21 @@
                                 <span class="input-label">Trafego pago</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="mkt-trafego" class="has-prefix" placeholder="Meta, Google, etc." step="0.01" min="0">
+                                    <input type="text" id="mkt-trafego" class="has-prefix money-input" placeholder="Meta, Google, etc." inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Agencia</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="mkt-agencia" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="mkt-agencia" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Ferramentas</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="mkt-ferramentas" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="mkt-ferramentas" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -695,21 +695,21 @@
                                 <span class="input-label">Closers</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="com-closers" class="has-prefix" placeholder="Salarios" step="0.01" min="0">
+                                    <input type="text" id="com-closers" class="has-prefix money-input" placeholder="Salarios" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Comissao</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="com-comissao" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="com-comissao" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">SDRs</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="com-sdrs" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="com-sdrs" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -764,14 +764,14 @@
                                 <span class="input-label">Impostos</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="impostos" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="impostos" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Juros</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="juros" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="juros" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -794,7 +794,7 @@
                                 <span class="input-label">Distribuicao</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="distribuicao" class="has-prefix" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" id="distribuicao" class="has-prefix money-input" placeholder="0,00" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -825,7 +825,7 @@
                                 <span class="input-label">Custos Fixos</span>
                                 <div class="input-wrap">
                                     <span class="input-prefix">R$</span>
-                                    <input type="number" id="custos-fixos" class="has-prefix" placeholder="Usa OPEX se vazio" step="0.01" min="0">
+                                    <input type="text" id="custos-fixos" class="has-prefix money-input" placeholder="Usa OPEX se vazio" inputmode="numeric">
                                 </div>
                             </div>
                         </div>
@@ -852,7 +852,31 @@
 </div>
 
 <script>
-    function val(id) { return parseFloat(document.getElementById(id).value) || 0; }
+    // ---- Mascara monetaria BRL (1.234,56) ----
+    function applyMoneyMask(input) {
+        input.addEventListener('input', function(e) {
+            let v = input.value.replace(/\D/g, '');
+            if (v === '') { input.value = ''; calculate(); return; }
+            v = v.replace(/^0+/, '') || '0';
+            while (v.length < 3) v = '0' + v;
+            const cents = v.slice(-2);
+            let intPart = v.slice(0, -2);
+            intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            input.value = intPart + ',' + cents;
+            calculate();
+        });
+    }
+
+    document.querySelectorAll('.money-input').forEach(applyMoneyMask);
+
+    function val(id) {
+        const el = document.getElementById(id);
+        if (el.classList.contains('money-input')) {
+            const raw = el.value.replace(/\./g, '').replace(',', '.');
+            return parseFloat(raw) || 0;
+        }
+        return parseFloat(el.value) || 0;
+    }
 
     function formatBRL(n) {
         return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -998,6 +1022,7 @@
     document.querySelectorAll('input[type="number"]').forEach(el => {
         el.addEventListener('input', calculate);
     });
+
     calculate();
 </script>
 </body>
