@@ -249,6 +249,18 @@
             position: relative;
             flex: 1;
         }
+        .input-wrap.has-currency {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .currency-sign {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
         .input-prefix {
             position: absolute;
             left: 0.75rem;
@@ -422,7 +434,8 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Preco de venda</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="preco-venda" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -444,7 +457,8 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Custo unitario</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="custo-unitario" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -480,7 +494,8 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Faturamento</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="ticket-faturamento" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -563,25 +578,29 @@
                         <div class="opex-grid">
                             <div class="input-row">
                                 <span class="input-label">Salarios</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="opex-salarios" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Aluguel</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="opex-aluguel" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Marketing</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="opex-marketing" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Outros custos</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="opex-outros" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -616,7 +635,8 @@
                             <div class="inputs">
                                 <div class="input-row">
                                     <span class="input-label">Investimento</span>
-                                    <div class="input-wrap">
+                                    <div class="input-wrap has-currency">
+                                        <span class="currency-sign">R$</span>
                                         <input type="text" id="capex-valor" class="money-input" placeholder="" inputmode="numeric">
                                     </div>
                                 </div>
@@ -654,19 +674,22 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Trafego pago</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="mkt-trafego" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Agencia</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="mkt-agencia" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Ferramentas</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="mkt-ferramentas" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -682,19 +705,22 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Closers</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="com-closers" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Comissao</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="com-comissao" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">SDRs</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="com-sdrs" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -748,13 +774,15 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Impostos</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="impostos" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
                             <div class="input-row">
                                 <span class="input-label">Juros</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="juros" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -776,7 +804,8 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Distribuicao</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="distribuicao" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
@@ -806,7 +835,8 @@
                         <div class="inputs">
                             <div class="input-row">
                                 <span class="input-label">Custos Fixos</span>
-                                <div class="input-wrap">
+                                <div class="input-wrap has-currency">
+                                    <span class="currency-sign">R$</span>
                                     <input type="text" id="custos-fixos" class="money-input" placeholder="" inputmode="numeric">
                                 </div>
                             </div>
