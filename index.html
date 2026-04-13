@@ -7,6 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- SheetJS for XLSX parsing/generation -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Chart.js for dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -361,6 +365,349 @@
         @media (max-width: 420px) {
             .summary { grid-template-columns: 1fr; }
         }
+
+        /* ---- Tab Navigation ---- */
+        .main-nav {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.35rem;
+            width: fit-content;
+        }
+        .nav-tab {
+            background: none;
+            border: none;
+            padding: 0.5rem 1.4rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-radius: calc(var(--radius) - 4px);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            letter-spacing: -0.01em;
+        }
+        .nav-tab:hover { background: var(--bg); color: var(--text); }
+        .nav-tab.active { background: var(--green); color: #fff; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ---- Empty State (upload) ---- */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 4rem 1.5rem;
+            gap: 1.25rem;
+        }
+        .empty-icon {
+            font-size: 2.5rem;
+            line-height: 1;
+        }
+        .empty-state h2 {
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .empty-state p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-width: 420px;
+            line-height: 1.6;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.65rem 1.4rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .btn-primary { background: var(--green); color: #fff; }
+        .btn-primary:hover { background: #15803d; }
+        .btn-outline {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1.5px solid var(--border);
+        }
+        .btn-outline:hover { border-color: var(--text-secondary); }
+        .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.78rem; }
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 2.5rem 2rem;
+            width: 100%;
+            max-width: 460px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-input);
+        }
+        .upload-zone:hover, .upload-zone.drag-over {
+            border-color: var(--green);
+            background: var(--green-bg);
+        }
+        .upload-zone input[type="file"] { display: none; }
+        .upload-zone-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        .upload-zone-icon { font-size: 1.8rem; }
+        .upload-zone-text { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+        .upload-zone-sub { font-size: 0.75rem; color: var(--text-muted); }
+        .upload-error {
+            font-size: 0.8rem;
+            color: var(--red);
+            background: var(--red-bg);
+            border: 1px solid var(--red-border);
+            border-radius: var(--radius-sm);
+            padding: 0.6rem 1rem;
+            max-width: 460px;
+            width: 100%;
+            display: none;
+        }
+
+        /* ---- Dashboard toolbar ---- */
+        .dash-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+        .dash-filename {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .dash-filename strong { color: var(--text); }
+
+        /* ---- KPI cards row ---- */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem 1.1rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .kpi-label {
+            font-size: 0.67rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+        }
+        .kpi-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .kpi-value.green { color: var(--green); }
+        .kpi-value.red { color: var(--red); }
+        .kpi-value.teal { color: var(--teal); }
+        .kpi-value.blue { color: var(--blue); }
+        .kpi-value.amber { color: var(--amber); }
+        .kpi-value.purple { color: var(--purple); }
+
+        /* ---- Charts ---- */
+        .dash-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .chart-card.full { grid-column: 1 / -1; }
+        .chart-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+        .chart-wrap { position: relative; }
+
+        /* ---- Insights ---- */
+        .insights-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .insights-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 0.85rem;
+        }
+        .insight-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-sm);
+        }
+        .insight-item.positive { background: var(--green-bg); color: #14532d; }
+        .insight-item.negative { background: var(--red-bg); color: #7f1d1d; }
+        .insight-item.neutral { background: var(--blue-bg); color: #1e3a8a; }
+        .insight-item.warning { background: var(--amber-bg); color: #78350f; }
+        .insight-dot { font-size: 0.7rem; margin-top: 0.2rem; flex-shrink: 0; }
+
+        /* ---- DRE/FC Table ---- */
+        .dre-table-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .dre-table-header {
+            padding: 1rem 1.5rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .dre-table-scroll { overflow-x: auto; }
+        .dre-tbl {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+        .dre-tbl th {
+            background: var(--bg);
+            padding: 0.5rem 0.75rem;
+            font-weight: 600;
+            text-align: right;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.7rem;
+        }
+        .dre-tbl th:first-child { text-align: left; min-width: 200px; position: sticky; left: 0; background: var(--bg); z-index: 1; }
+        .dre-tbl td {
+            padding: 0.45rem 0.75rem;
+            text-align: right;
+            border-bottom: 1px solid var(--border-light);
+            font-family: 'Space Mono', monospace;
+        }
+        .dre-tbl td:first-child {
+            text-align: left;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 500;
+            position: sticky;
+            left: 0;
+            background: var(--bg-card);
+            z-index: 1;
+        }
+        .dre-tbl tr.section-header td {
+            background: var(--bg);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 700;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            padding-top: 0.75rem;
+        }
+        .dre-tbl tr.section-header td:first-child { background: var(--bg); }
+        .dre-tbl tr.calc-row td {
+            font-weight: 700;
+            background: var(--bg-result);
+        }
+        .dre-tbl tr.calc-row td:first-child { background: var(--bg-result); }
+        .dre-tbl tr.resultado-row td {
+            background: #f5f3ff;
+            font-weight: 800;
+            font-size: 0.82rem;
+        }
+        .dre-tbl tr.resultado-row td:first-child { background: #f5f3ff; }
+        .dre-tbl tr.pct-row td {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            background: var(--bg-card);
+        }
+        .dre-tbl tr.pct-row td:first-child { background: var(--bg-card); }
+        .dre-tbl td.positive { color: var(--green); }
+        .dre-tbl td.negative { color: var(--red); }
+        .dre-tbl td.indent { padding-left: 1.5rem; }
+
+        /* ---- Metas ---- */
+        .metas-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .metas-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.85rem; }
+        .meta-list { display: flex; flex-direction: column; gap: 0.65rem; }
+        .meta-item { display: flex; flex-direction: column; gap: 0.25rem; }
+        .meta-row-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            font-weight: 500;
+        }
+        .meta-row-header span:last-child { font-family: 'Space Mono', monospace; }
+        .progress-wrap {
+            height: 6px;
+            background: var(--border-light);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 99px;
+            transition: width 0.4s ease;
+            min-width: 2px;
+        }
+        .progress-fill.green { background: var(--green); }
+        .progress-fill.amber { background: var(--amber); }
+        .progress-fill.red { background: var(--red); }
+
+        @media (max-width: 700px) {
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .dash-grid-2 { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 420px) {
+            .kpi-row { grid-template-columns: 1fr 1fr; }
+            .main-nav { width: 100%; }
+            .nav-tab { flex: 1; text-align: center; padding: 0.5rem 0.5rem; font-size: 0.78rem; }
+        }
     </style>
 </head>
 <body>
@@ -370,6 +717,16 @@
         <h1>Business<span>Calc</span></h1>
         <p>Painel de indicadores financeiros para tomada de decisao</p>
     </header>
+
+    <!-- Tab Navigation -->
+    <nav class="main-nav">
+        <button class="nav-tab active" data-tab="calculadoras">Calculadoras</button>
+        <button class="nav-tab" data-tab="dre">DRE</button>
+        <button class="nav-tab" data-tab="fc">Fluxo de Caixa</button>
+    </nav>
+
+    <!-- Tab: Calculadoras -->
+    <div id="tab-calculadoras" class="tab-panel active">
 
     <!-- Summary -->
     <div class="summary">
@@ -858,6 +1215,108 @@
 
     </div>
 
+    </div><!-- /tab-calculadoras -->
+
+    <!-- Tab: DRE -->
+    <div id="tab-dre" class="tab-panel">
+        <!-- Empty state -->
+        <div id="dre-empty" class="empty-state">
+            <div class="empty-icon">📊</div>
+            <h2>DRE — Demonstracao do Resultado</h2>
+            <p>Baixe o template, preencha com seus dados no Excel ou Google Sheets e faca o upload. O app gera o dashboard automaticamente.</p>
+            <button class="btn btn-primary" onclick="downloadTemplate()">&#8659; Baixar Template (DRE + FC + Metas)</button>
+            <div class="upload-zone" id="dre-drop">
+                <input type="file" id="dre-file" accept=".xlsx">
+                <label for="dre-file" class="upload-zone-label">
+                    <span class="upload-zone-icon">&#128193;</span>
+                    <span class="upload-zone-text">Arraste o arquivo ou clique para selecionar</span>
+                    <span class="upload-zone-sub">Somente arquivos .xlsx — max 10 MB</span>
+                </label>
+            </div>
+            <div class="upload-error" id="dre-error"></div>
+        </div>
+        <!-- Dashboard (hidden until upload) -->
+        <div id="dre-dashboard" style="display:none">
+            <div class="dash-toolbar">
+                <span class="dash-filename">Arquivo: <strong id="dre-filename">—</strong></span>
+                <button class="btn btn-outline btn-sm" onclick="clearDashboard('dre')">&#8635; Trocar arquivo</button>
+            </div>
+            <div class="kpi-row" id="dre-kpis"></div>
+            <div class="dash-grid-2" style="margin-bottom:1.5rem">
+                <div class="chart-card full">
+                    <div class="chart-title">Evolucao Mensal — Receita, Lucro Bruto e Resultado</div>
+                    <div class="chart-wrap"><canvas id="chart-dre-evolution" height="90"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Composicao de Custos e Despesas (anual)</div>
+                    <div class="chart-wrap"><canvas id="chart-dre-custos" height="220"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Margens Mensais (%)</div>
+                    <div class="chart-wrap"><canvas id="chart-dre-margens" height="220"></canvas></div>
+                </div>
+            </div>
+            <div class="dre-table-wrap">
+                <div class="dre-table-header">DRE Completa — Jan a Dez</div>
+                <div class="dre-table-scroll"><div id="dre-table-container"></div></div>
+            </div>
+            <div id="dre-metas-section"></div>
+            <div class="insights-card">
+                <div class="insights-title">&#128161; Insights Estrategicos</div>
+                <div class="insight-list" id="dre-insights"></div>
+            </div>
+        </div>
+    </div><!-- /tab-dre -->
+
+    <!-- Tab: Fluxo de Caixa -->
+    <div id="tab-fc" class="tab-panel">
+        <!-- Empty state -->
+        <div id="fc-empty" class="empty-state">
+            <div class="empty-icon">&#128178;</div>
+            <h2>Fluxo de Caixa</h2>
+            <p>Use o mesmo arquivo enviado na aba DRE ou faca um novo upload. O template ja inclui a aba FC.</p>
+            <div class="upload-zone" id="fc-drop">
+                <input type="file" id="fc-file" accept=".xlsx">
+                <label for="fc-file" class="upload-zone-label">
+                    <span class="upload-zone-icon">&#128193;</span>
+                    <span class="upload-zone-text">Arraste o arquivo ou clique para selecionar</span>
+                    <span class="upload-zone-sub">Somente arquivos .xlsx — max 10 MB</span>
+                </label>
+            </div>
+            <div class="upload-error" id="fc-error"></div>
+        </div>
+        <!-- Dashboard -->
+        <div id="fc-dashboard" style="display:none">
+            <div class="dash-toolbar">
+                <span class="dash-filename">Arquivo: <strong id="fc-filename">—</strong></span>
+                <button class="btn btn-outline btn-sm" onclick="clearDashboard('fc')">&#8635; Trocar arquivo</button>
+            </div>
+            <div class="kpi-row" id="fc-kpis"></div>
+            <div class="dash-grid-2" style="margin-bottom:1.5rem">
+                <div class="chart-card full">
+                    <div class="chart-title">Entradas, Saidas e Saldo — Mensal</div>
+                    <div class="chart-wrap"><canvas id="chart-fc-saldo" height="100"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Composicao das Saidas (anual)</div>
+                    <div class="chart-wrap"><canvas id="chart-fc-custos" height="220"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">Ticket Medio Mensal</div>
+                    <div class="chart-wrap"><canvas id="chart-fc-ticket" height="220"></canvas></div>
+                </div>
+            </div>
+            <div class="dre-table-wrap">
+                <div class="dre-table-header">Fluxo de Caixa Completo — Jan a Dez</div>
+                <div class="dre-table-scroll"><div id="fc-table-container"></div></div>
+            </div>
+            <div class="insights-card">
+                <div class="insights-title">&#128161; Insights de Caixa</div>
+                <div class="insight-list" id="fc-insights"></div>
+            </div>
+        </div>
+    </div><!-- /tab-fc -->
+
     <footer class="footer">
         <p>BusinessCalc — Painel de indicadores financeiros</p>
     </footer>
@@ -1036,6 +1495,733 @@
     });
 
     calculate();
+
+    // =========================================================
+    // TAB NAVIGATION
+    // =========================================================
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // =========================================================
+    // CONSTANTS
+    // =========================================================
+    const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const CHART_COLORS = {
+        green:'#16a34a', teal:'#0d9488', red:'#dc2626', amber:'#d97706',
+        blue:'#2563eb', purple:'#7c3aed', pink:'#db2777', gray:'#9e9890'
+    };
+
+    // Row labels the parser looks for in column A
+    const DRE_LABELS = {
+        receita:          'Receita de Vendas',
+        deducoes:         'Deducoes e Impostos',
+        cmv:              'CMV / Logistica',
+        outrosCustos:     'Outros Custos Diretos',
+        equipamentos:     'Equipamentos',
+        provisao:         'Provisao Manutencao',
+        pessoal:          'Pessoal (Salarios CLT)',
+        beneficios:       'Beneficios',
+        inss:             'INSS / FGTS',
+        proLabore:        'Pro-Labore',
+        ferias:           'Ferias / 13',
+        aluguel:          'Aluguel',
+        marketing:        'Marketing',
+        ti:               'TI / Tecnologia',
+        diversas:         'Despesas Diversas',
+        manutPredial:     'Manutencao Predial',
+        exames:           'Exames / Saude',
+        despFin:          'Despesas Financeiras',
+    };
+    const FC_EXTRA_LABELS = {
+        pedidos:    'Numero de Pedidos',
+        ticketMedio:'Ticket Medio',
+    };
+    const METAS_LABELS = {
+        metaReceita:   'Receita Anual',
+        metaLucro:     'Lucro Liquido Anual',
+        metaMargemBruta: 'Margem Bruta (%)',
+        metaMargemOp:  'Margem Operacional (%)',
+        metaMargemLiq: 'Margem Liquida (%)',
+        metaTicket:    'Ticket Medio',
+        metaPedidos:   'Pedidos/Mes',
+    };
+
+    // =========================================================
+    // TEMPLATE GENERATOR
+    // =========================================================
+    function downloadTemplate() {
+        const wb = XLSX.utils.book_new();
+        const M = MONTHS;
+
+        function makeRows(titleRows, dataLabels) {
+            const rows = [...titleRows, [], ['Categoria', ...M]];
+            for (const lbl of dataLabels) {
+                if (typeof lbl === 'string' && lbl.startsWith('__')) {
+                    rows.push([lbl.slice(2)]);  // section header
+                } else {
+                    rows.push([lbl, ...M.map(() => 0)]);
+                }
+            }
+            return rows;
+        }
+
+        // DRE sheet
+        const dreLabels = [
+            '__RECEITA',
+            DRE_LABELS.receita, DRE_LABELS.deducoes,
+            '__CUSTOS DIRETOS',
+            DRE_LABELS.cmv, DRE_LABELS.outrosCustos, DRE_LABELS.equipamentos, DRE_LABELS.provisao,
+            '__DESPESAS OPERACIONAIS',
+            DRE_LABELS.pessoal, DRE_LABELS.beneficios, DRE_LABELS.inss, DRE_LABELS.proLabore,
+            DRE_LABELS.ferias, DRE_LABELS.aluguel, DRE_LABELS.marketing, DRE_LABELS.ti,
+            DRE_LABELS.diversas, DRE_LABELS.manutPredial, DRE_LABELS.exames, DRE_LABELS.despFin,
+        ];
+        const dreWs = XLSX.utils.aoa_to_sheet(makeRows(
+            [['BusinessCalc - Template DRE'],['Nao altere as etiquetas na coluna A. Preencha apenas os valores numericos.']],
+            dreLabels
+        ));
+        XLSX.utils.book_append_sheet(wb, dreWs, 'DRE');
+
+        // FC sheet
+        const fcLabels = [
+            '__ENTRADAS',
+            FC_EXTRA_LABELS.pedidos, FC_EXTRA_LABELS.ticketMedio, DRE_LABELS.receita,
+            '__SAIDAS',
+            DRE_LABELS.cmv, DRE_LABELS.outrosCustos, DRE_LABELS.equipamentos, DRE_LABELS.provisao,
+            DRE_LABELS.pessoal, DRE_LABELS.beneficios, DRE_LABELS.inss, DRE_LABELS.proLabore,
+            DRE_LABELS.ferias, DRE_LABELS.aluguel, DRE_LABELS.marketing, DRE_LABELS.ti,
+            DRE_LABELS.diversas, DRE_LABELS.manutPredial, DRE_LABELS.exames, DRE_LABELS.despFin,
+        ];
+        const fcWs = XLSX.utils.aoa_to_sheet(makeRows(
+            [['BusinessCalc - Template Fluxo de Caixa'],['Nao altere as etiquetas na coluna A.']],
+            fcLabels
+        ));
+        XLSX.utils.book_append_sheet(wb, fcWs, 'FC');
+
+        // Metas sheet
+        const metasRows = [
+            ['BusinessCalc - Metas Anuais'],
+            ['Defina suas metas. Os valores de % devem ser inseridos como numero (ex: 30 para 30%).'],
+            [],
+            ['Meta', 'Valor'],
+            [METAS_LABELS.metaReceita, 0],
+            [METAS_LABELS.metaLucro, 0],
+            [METAS_LABELS.metaMargemBruta, 0],
+            [METAS_LABELS.metaMargemOp, 0],
+            [METAS_LABELS.metaMargemLiq, 0],
+            [METAS_LABELS.metaTicket, 0],
+            [METAS_LABELS.metaPedidos, 0],
+        ];
+        const metasWs = XLSX.utils.aoa_to_sheet(metasRows);
+        XLSX.utils.book_append_sheet(wb, metasWs, 'Metas');
+
+        XLSX.writeFile(wb, 'BusinessCalc-Template.xlsx');
+    }
+
+    // =========================================================
+    // XLSX PARSER
+    // =========================================================
+    function safeNum(v) { return isFinite(parseFloat(v)) ? parseFloat(v) : 0; }
+
+    function parseSheetByLabel(ws, labelMap) {
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: 0 });
+        const reverse = {};
+        for (const [key, lbl] of Object.entries(labelMap)) reverse[lbl] = key;
+        const result = {};
+        for (const key of Object.keys(labelMap)) result[key] = new Array(12).fill(0);
+        for (const row of aoa) {
+            if (!row || row[0] === undefined) continue;
+            const lbl = String(row[0]).trim();
+            if (reverse[lbl]) {
+                const key = reverse[lbl];
+                for (let i = 0; i < 12; i++) result[key][i] = safeNum(row[i + 1]);
+            }
+        }
+        return result;
+    }
+
+    function parseMetas(ws) {
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: 0 });
+        const reverse = {};
+        for (const [key, lbl] of Object.entries(METAS_LABELS)) reverse[lbl] = key;
+        const result = {};
+        for (const key of Object.keys(METAS_LABELS)) result[key] = 0;
+        for (const row of aoa) {
+            if (!row || row[0] === undefined) continue;
+            const lbl = String(row[0]).trim();
+            if (reverse[lbl]) result[reverse[lbl]] = safeNum(row[1]);
+        }
+        return result;
+    }
+
+    function validateFile(file) {
+        if (!file) return 'Nenhum arquivo selecionado.';
+        if (!file.name.endsWith('.xlsx')) return 'Formato invalido. Envie um arquivo .xlsx.';
+        if (file.size > 10 * 1024 * 1024) return 'Arquivo muito grande. Maximo 10 MB.';
+        return null;
+    }
+
+    function processFile(file, tab) {
+        const err = validateFile(file);
+        if (err) { showUploadError(tab, err); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                if (tab === 'dre') {
+                    const dreWs = wb.Sheets['DRE'] || wb.Sheets[wb.SheetNames[0]];
+                    const raw = parseSheetByLabel(dreWs, DRE_LABELS);
+                    const metasWs = wb.Sheets['Metas'];
+                    const metas = metasWs ? parseMetas(metasWs) : {};
+                    const computed = computeDRE(raw);
+                    computed.metas = metas;
+                    localStorage.setItem('bc-dre', JSON.stringify(computed));
+                    localStorage.setItem('bc-dre-file', String(file.name).replace(/[<>"'&]/g, ''));
+                    renderDREDashboard(computed, file.name);
+                } else {
+                    const fcWs = wb.Sheets['FC'] || wb.Sheets[wb.SheetNames[0]];
+                    const raw = parseSheetByLabel(fcWs, { ...DRE_LABELS, ...FC_EXTRA_LABELS });
+                    const computed = computeFC(raw);
+                    localStorage.setItem('bc-fc', JSON.stringify(computed));
+                    localStorage.setItem('bc-fc-file', String(file.name).replace(/[<>"'&]/g, ''));
+                    renderFCDashboard(computed, file.name);
+                }
+            } catch (ex) {
+                showUploadError(tab, 'Erro ao ler o arquivo. Certifique-se de usar o template correto.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function showUploadError(tab, msg) {
+        const el = document.getElementById(tab + '-error');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    // Wire upload inputs and drag-drop
+    ['dre', 'fc'].forEach(tab => {
+        const input = document.getElementById(tab + '-file');
+        const zone  = document.getElementById(tab + '-drop');
+        input.addEventListener('change', () => { if (input.files[0]) processFile(input.files[0], tab); });
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+            processFile(e.dataTransfer.files[0], tab);
+        });
+    });
+
+    function clearDashboard(tab) {
+        localStorage.removeItem('bc-' + tab);
+        localStorage.removeItem('bc-' + tab + '-file');
+        document.getElementById(tab + '-empty').style.display = 'flex';
+        document.getElementById(tab + '-dashboard').style.display = 'none';
+        if (tab === 'dre') { destroyCharts(dreCharts); }
+        else { destroyCharts(fcCharts); }
+    }
+
+    // =========================================================
+    // CALCULATIONS
+    // =========================================================
+    const sumArr = a => a.reduce((s, v) => s + v, 0);
+    const zipSub = (a, b) => a.map((v, i) => v - b[i]);
+    const zipAdd = (...arrs) => arrs[0].map((_, i) => arrs.reduce((s, a) => s + a[i], 0));
+
+    function computeDRE(r) {
+        const g = k => r[k] || new Array(12).fill(0);
+        const receitaLiq  = zipSub(g('receita'), g('deducoes'));
+        const custosDiretos = zipAdd(g('cmv'), g('outrosCustos'), g('equipamentos'), g('provisao'));
+        const lucroBruto  = zipSub(receitaLiq, custosDiretos);
+        const despOp      = zipAdd(g('pessoal'), g('beneficios'), g('inss'), g('proLabore'),
+                                   g('ferias'), g('aluguel'), g('marketing'), g('ti'),
+                                   g('diversas'), g('manutPredial'), g('exames'), g('despFin'));
+        const resultadoLiq = zipSub(lucroBruto, despOp);
+        const rec = g('receita');
+        return {
+            ...r, receitaLiq, custosDiretos, lucroBruto, despOp, resultadoLiq,
+            margemBrutaMensal: rec.map((v, i) => v > 0 ? (lucroBruto[i] / v) * 100 : 0),
+            margemLiqMensal:   rec.map((v, i) => v > 0 ? (resultadoLiq[i] / v) * 100 : 0),
+            margemOpMensal:    rec.map((v, i) => v > 0 ? ((resultadoLiq[i] + (r.despFin||new Array(12).fill(0))[i]) / v) * 100 : 0),
+        };
+    }
+
+    function computeFC(r) {
+        const g = k => r[k] || new Array(12).fill(0);
+        const totalSaidas = zipAdd(g('cmv'), g('outrosCustos'), g('equipamentos'), g('provisao'),
+                                   g('pessoal'), g('beneficios'), g('inss'), g('proLabore'),
+                                   g('ferias'), g('aluguel'), g('marketing'), g('ti'),
+                                   g('diversas'), g('manutPredial'), g('exames'), g('despFin'));
+        const saldo = zipSub(g('receita'), totalSaidas);
+        return { ...r, totalSaidas, saldo };
+    }
+
+    // =========================================================
+    // CHART HELPERS
+    // =========================================================
+    const dreCharts = { evolution: null, custos: null, margens: null };
+    const fcCharts  = { saldo: null, custos: null, ticket: null };
+
+    function destroyCharts(obj) {
+        for (const k of Object.keys(obj)) { if (obj[k]) { obj[k].destroy(); obj[k] = null; } }
+    }
+
+    const lineDataset = (label, data, color, fill=false) => ({
+        label, data, borderColor: color, backgroundColor: color + '22',
+        borderWidth: 2, pointRadius: 3, tension: 0.3, fill
+    });
+
+    // =========================================================
+    // DRE DASHBOARD
+    // =========================================================
+    function renderDREDashboard(d, filename) {
+        document.getElementById('dre-empty').style.display = 'none';
+        document.getElementById('dre-dashboard').style.display = 'block';
+        document.getElementById('dre-filename').textContent = filename || '—';
+
+        const totalRec = sumArr(d.receita);
+        const totalLB  = sumArr(d.lucroBruto);
+        const totalRes = sumArr(d.resultadoLiq);
+        const mbAnual  = totalRec > 0 ? (totalLB / totalRec) * 100 : 0;
+        const mlAnual  = totalRec > 0 ? (totalRes / totalRec) * 100 : 0;
+        const totalDespOp = sumArr(d.despOp);
+
+        // KPIs
+        const kpis = [
+            { label: 'Receita Anual',     value: formatBRL(totalRec),  cls: 'green'  },
+            { label: 'Lucro Bruto',       value: formatBRL(totalLB),   cls: totalLB >= 0 ? 'teal' : 'red' },
+            { label: 'Resultado Liquido', value: formatBRL(totalRes),  cls: totalRes >= 0 ? 'purple' : 'red' },
+            { label: 'Margem Bruta',      value: formatPct(mbAnual),   cls: mbAnual >= 30 ? 'green' : mbAnual >= 10 ? 'amber' : 'red' },
+            { label: 'Margem Liquida',    value: formatPct(mlAnual),   cls: mlAnual >= 10 ? 'green' : mlAnual >= 0 ? 'amber' : 'red' },
+            { label: 'Total Despesas Op', value: formatBRL(totalDespOp), cls: 'blue' },
+            { label: 'Total Custos Dir',  value: formatBRL(sumArr(d.custosDiretos)), cls: 'amber' },
+            { label: 'Pior Mes',          value: MONTHS[d.resultadoLiq.indexOf(Math.min(...d.resultadoLiq))], cls: 'red' },
+        ];
+        const kpiRow = document.getElementById('dre-kpis');
+        kpiRow.innerHTML = '';
+        kpis.forEach(k => {
+            const card = document.createElement('div');
+            card.className = 'kpi-card';
+            const lbl = document.createElement('div'); lbl.className = 'kpi-label'; lbl.textContent = k.label;
+            const val = document.createElement('div'); val.className = 'kpi-value ' + k.cls; val.textContent = k.value;
+            card.appendChild(lbl); card.appendChild(val);
+            kpiRow.appendChild(card);
+        });
+
+        // Charts
+        destroyCharts(dreCharts);
+
+        dreCharts.evolution = new Chart(document.getElementById('chart-dre-evolution'), {
+            type: 'line',
+            data: {
+                labels: MONTHS,
+                datasets: [
+                    lineDataset('Receita', d.receita, CHART_COLORS.green, true),
+                    lineDataset('Lucro Bruto', d.lucroBruto, CHART_COLORS.teal),
+                    lineDataset('Resultado Liquido', d.resultadoLiq, CHART_COLORS.purple),
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } } } }
+        });
+
+        const g = k => d[k] || new Array(12).fill(0);
+        const custosLabels = ['CMV/Logistica','Pessoal','INSS+Benef+Ferias','Aluguel','Marketing','TI','Outros'];
+        const custosData = [
+            sumArr(g('cmv')),
+            sumArr(g('pessoal')),
+            sumArr(g('inss')) + sumArr(g('beneficios')) + sumArr(g('ferias')),
+            sumArr(g('aluguel')),
+            sumArr(g('marketing')),
+            sumArr(g('ti')),
+            sumArr(g('outrosCustos')) + sumArr(g('equipamentos')) + sumArr(g('provisao')) +
+            sumArr(g('diversas')) + sumArr(g('manutPredial')) + sumArr(g('exames')) +
+            sumArr(g('despFin')) + sumArr(g('proLabore')),
+        ].map(v => Math.max(0, v));
+        dreCharts.custos = new Chart(document.getElementById('chart-dre-custos'), {
+            type: 'doughnut',
+            data: {
+                labels: custosLabels,
+                datasets: [{ data: custosData,
+                    backgroundColor: ['#dc2626','#2563eb','#7c3aed','#d97706','#db2777','#0d9488','#9e9890'],
+                    borderWidth: 2, borderColor: '#fff' }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+        });
+
+        dreCharts.margens = new Chart(document.getElementById('chart-dre-margens'), {
+            type: 'line',
+            data: {
+                labels: MONTHS,
+                datasets: [
+                    lineDataset('Margem Bruta %', d.margemBrutaMensal, CHART_COLORS.teal),
+                    lineDataset('Margem Op %', d.margemOpMensal, CHART_COLORS.blue),
+                    lineDataset('Margem Liquida %', d.margemLiqMensal, CHART_COLORS.purple),
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } },
+                scales: { y: { ticks: { callback: v => v.toFixed(0) + '%' } } } }
+        });
+
+        // Table
+        renderDRETable(d);
+
+        // Metas
+        if (d.metas && Object.values(d.metas).some(v => v > 0)) renderMetas(d);
+
+        // Insights
+        const insights = document.getElementById('dre-insights');
+        insights.innerHTML = '';
+        generateDREInsights(d).forEach(ins => {
+            const el = document.createElement('div');
+            el.className = 'insight-item ' + ins.type;
+            const dot = document.createElement('span'); dot.className = 'insight-dot';
+            dot.textContent = ins.type === 'positive' ? '▲' : ins.type === 'negative' ? '▼' : ins.type === 'warning' ? '!' : '●';
+            const txt = document.createElement('span'); txt.textContent = ins.text;
+            el.appendChild(dot); el.appendChild(txt);
+            insights.appendChild(el);
+        });
+    }
+
+    function renderDRETable(d) {
+        const g = k => d[k] || new Array(12).fill(0);
+        const fmtCell = v => v === 0 ? '—' : (v < 0 ? '-' : '') + 'R$' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+        const fmtPct  = v => isFinite(v) ? v.toFixed(1) + '%' : '—';
+
+        const table = document.createElement('table');
+        table.className = 'dre-tbl';
+
+        const thead = document.createElement('thead');
+        const hrow = document.createElement('tr');
+        ['Categoria',...MONTHS,'Total'].forEach(h => {
+            const th = document.createElement('th'); th.textContent = h; hrow.appendChild(th);
+        });
+        thead.appendChild(hrow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+
+        const addSection = label => {
+            const tr = document.createElement('tr'); tr.className = 'section-header';
+            const td = document.createElement('td'); td.colSpan = 14; td.textContent = label;
+            tr.appendChild(td); tbody.appendChild(tr);
+        };
+
+        const addRow = (label, arr, cls='', indent=true) => {
+            const tr = document.createElement('tr'); if (cls) tr.className = cls;
+            const tdL = document.createElement('td'); tdL.textContent = label;
+            if (indent) tdL.className = 'indent'; tr.appendChild(tdL);
+            const total = sumArr(arr);
+            [...arr, total].forEach(v => {
+                const td = document.createElement('td');
+                td.textContent = fmtCell(v);
+                if (v < 0) td.className = 'negative';
+                else if (v > 0 && cls.includes('resultado')) td.className = 'positive';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        };
+
+        const addPctRow = (label, numArr, denArr) => {
+            const tr = document.createElement('tr'); tr.className = 'pct-row';
+            const tdL = document.createElement('td'); tdL.textContent = label; tdL.className = 'indent'; tr.appendChild(tdL);
+            const totalNum = sumArr(numArr); const totalDen = sumArr(denArr);
+            [...numArr.map((v,i) => denArr[i] > 0 ? (v/denArr[i])*100 : 0), totalDen > 0 ? (totalNum/totalDen)*100 : 0].forEach(v => {
+                const td = document.createElement('td'); td.textContent = fmtPct(v); tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        };
+
+        addSection('RECEITA');
+        addRow('Receita de Vendas', g('receita'));
+        addRow('Deducoes e Impostos', g('deducoes').map(v=>-v));
+        addRow('= Receita Liquida', d.receitaLiq, 'calc-row', false);
+
+        addSection('CUSTOS DIRETOS');
+        ['cmv','outrosCustos','equipamentos','provisao'].forEach(k => addRow(DRE_LABELS[k]||k, g(k).map(v=>-v)));
+        addRow('= Lucro Bruto', d.lucroBruto, 'calc-row', false);
+        addPctRow('Margem Bruta %', d.lucroBruto, g('receita'));
+
+        addSection('DESPESAS OPERACIONAIS');
+        ['pessoal','beneficios','inss','proLabore','ferias','aluguel','marketing','ti','diversas','manutPredial','exames','despFin']
+            .forEach(k => addRow(DRE_LABELS[k]||k, g(k).map(v=>-v)));
+        addRow('= Total Despesas Op', d.despOp.map(v=>-v), 'calc-row', false);
+
+        addRow('= RESULTADO LIQUIDO', d.resultadoLiq, 'resultado-row', false);
+        addPctRow('Margem Liquida %', d.resultadoLiq, g('receita'));
+
+        table.appendChild(tbody);
+        const container = document.getElementById('dre-table-container');
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+
+    function renderMetas(d) {
+        const m = d.metas || {};
+        const totalRec = sumArr(d.receita);
+        const totalRes = sumArr(d.resultadoLiq);
+        const mbAnual  = sumArr(d.receita) > 0 ? (sumArr(d.lucroBruto) / totalRec) * 100 : 0;
+        const mlAnual  = totalRec > 0 ? (totalRes / totalRec) * 100 : 0;
+
+        const comparisons = [
+            { label: 'Receita Anual', realizado: totalRec, meta: m.metaReceita, fmt: formatBRL },
+            { label: 'Resultado Liquido', realizado: totalRes, meta: m.metaLucro, fmt: formatBRL },
+            { label: 'Margem Bruta (%)', realizado: mbAnual, meta: m.metaMargemBruta, fmt: v => formatPct(v) },
+            { label: 'Margem Liquida (%)', realizado: mlAnual, meta: m.metaMargemLiq, fmt: v => formatPct(v) },
+        ].filter(c => c.meta > 0);
+
+        if (!comparisons.length) return;
+
+        const section = document.getElementById('dre-metas-section');
+        section.innerHTML = '';
+        const card = document.createElement('div'); card.className = 'metas-card';
+        const title = document.createElement('div'); title.className = 'metas-title'; title.textContent = 'Metas vs Realizado';
+        card.appendChild(title);
+        const list = document.createElement('div'); list.className = 'meta-list';
+
+        comparisons.forEach(c => {
+            const pct = c.meta > 0 ? Math.min((c.realizado / c.meta) * 100, 150) : 0;
+            const color = pct >= 100 ? 'green' : pct >= 70 ? 'amber' : 'red';
+            const item = document.createElement('div'); item.className = 'meta-item';
+            const header = document.createElement('div'); header.className = 'meta-row-header';
+            const lblEl = document.createElement('span'); lblEl.textContent = c.label;
+            const valEl = document.createElement('span');
+            valEl.textContent = c.fmt(c.realizado) + ' / meta ' + c.fmt(c.meta) + ' (' + pct.toFixed(0) + '%)';
+            header.appendChild(lblEl); header.appendChild(valEl);
+            const bar = document.createElement('div'); bar.className = 'progress-wrap';
+            const fill = document.createElement('div'); fill.className = 'progress-fill ' + color;
+            fill.style.width = Math.min(pct, 100) + '%';
+            bar.appendChild(fill);
+            item.appendChild(header); item.appendChild(bar);
+            list.appendChild(item);
+        });
+        card.appendChild(list);
+        section.appendChild(card);
+    }
+
+    function generateDREInsights(d) {
+        const insights = [];
+        const g = k => d[k] || new Array(12).fill(0);
+        const totalRec = sumArr(d.receita);
+        const totalRes = sumArr(d.resultadoLiq);
+        const mlAnual  = totalRec > 0 ? (totalRes / totalRec) * 100 : 0;
+        const mbAnual  = totalRec > 0 ? (sumArr(d.lucroBruto) / totalRec) * 100 : 0;
+
+        const tipo = totalRes >= 0 ? 'positive' : 'negative';
+        insights.push({ text: 'Resultado anual: ' + formatBRL(totalRes) + ' — Margem Liquida media: ' + formatPct(mlAnual), type: tipo });
+
+        const maxIdx = d.resultadoLiq.indexOf(Math.max(...d.resultadoLiq));
+        const minIdx = d.resultadoLiq.indexOf(Math.min(...d.resultadoLiq));
+        insights.push({ text: 'Melhor mes: ' + MONTHS[maxIdx] + ' (' + formatBRL(d.resultadoLiq[maxIdx]) + ')', type: 'positive' });
+        if (d.resultadoLiq[minIdx] < 0) insights.push({ text: 'Mes critico: ' + MONTHS[minIdx] + ' (' + formatBRL(d.resultadoLiq[minIdx]) + ')', type: 'negative' });
+
+        const negativos = d.resultadoLiq.map((v,i) => v < 0 ? MONTHS[i] : null).filter(Boolean);
+        if (negativos.length) insights.push({ text: 'Meses com resultado negativo: ' + negativos.join(', '), type: 'negative' });
+
+        const h1 = sumArr(d.receita.slice(0,6)), h2 = sumArr(d.receita.slice(6));
+        if (h1 > 0 && h2 > 0) {
+            const cresc = ((h2 - h1) / h1) * 100;
+            insights.push({ text: 'Receita H2 vs H1: ' + (cresc>=0?'+':'') + formatPct(cresc) + ' (' + formatBRL(h2) + ' vs ' + formatBRL(h1) + ')', type: cresc >= 0 ? 'positive' : 'warning' });
+        }
+
+        const totalPessoalCompleto = sumArr(g('pessoal')) + sumArr(g('inss')) + sumArr(g('beneficios')) + sumArr(g('ferias')) + sumArr(g('proLabore'));
+        if (totalRec > 0 && totalPessoalCompleto > 0) {
+            const pct = (totalPessoalCompleto / totalRec) * 100;
+            insights.push({ text: 'Custo com pessoas (CLT+encargos+pro-labore): ' + formatPct(pct) + ' da receita (' + formatBRL(totalPessoalCompleto) + ')', type: pct > 40 ? 'warning' : 'neutral' });
+        }
+
+        if (totalRec > 0 && sumArr(g('marketing')) > 0) {
+            const pct = (sumArr(g('marketing')) / totalRec) * 100;
+            insights.push({ text: 'Marketing: ' + formatPct(pct) + ' da receita (' + formatBRL(sumArr(g('marketing'))) + ')', type: 'neutral' });
+        }
+
+        insights.push({ text: 'Margem Bruta anual: ' + formatPct(mbAnual), type: mbAnual >= 30 ? 'positive' : mbAnual >= 10 ? 'neutral' : 'negative' });
+
+        return insights;
+    }
+
+    // =========================================================
+    // FC DASHBOARD
+    // =========================================================
+    function renderFCDashboard(d, filename) {
+        document.getElementById('fc-empty').style.display = 'none';
+        document.getElementById('fc-dashboard').style.display = 'block';
+        document.getElementById('fc-filename').textContent = filename || '—';
+
+        const g = k => d[k] || new Array(12).fill(0);
+        const totalEntradas = sumArr(g('receita'));
+        const totalSaidas   = sumArr(d.totalSaidas);
+        const saldoTotal    = sumArr(d.saldo);
+        const pedidosTotal  = sumArr(g('pedidos'));
+        const ticketMedioAno = pedidosTotal > 0 ? totalEntradas / pedidosTotal : (sumArr(g('ticketMedio')) / 12);
+
+        // KPIs
+        const kpis = [
+            { label: 'Total Entradas',  value: formatBRL(totalEntradas), cls: 'green' },
+            { label: 'Total Saidas',    value: formatBRL(totalSaidas),   cls: 'red'   },
+            { label: 'Saldo Final',     value: formatBRL(saldoTotal),    cls: saldoTotal >= 0 ? 'teal' : 'red' },
+            { label: 'Total Pedidos',   value: pedidosTotal.toLocaleString('pt-BR'), cls: 'blue' },
+            { label: 'Ticket Medio',    value: formatBRL(ticketMedioAno), cls: 'amber' },
+            { label: 'Meses Negativos', value: d.saldo.filter(v => v < 0).length + '/12', cls: d.saldo.filter(v=>v<0).length > 3 ? 'red' : 'green' },
+        ];
+        const kpiRow = document.getElementById('fc-kpis');
+        kpiRow.innerHTML = '';
+        kpis.forEach(k => {
+            const card = document.createElement('div'); card.className = 'kpi-card';
+            const lbl = document.createElement('div'); lbl.className = 'kpi-label'; lbl.textContent = k.label;
+            const val = document.createElement('div'); val.className = 'kpi-value ' + k.cls; val.textContent = k.value;
+            card.appendChild(lbl); card.appendChild(val); kpiRow.appendChild(card);
+        });
+
+        // Charts
+        destroyCharts(fcCharts);
+
+        fcCharts.saldo = new Chart(document.getElementById('chart-fc-saldo'), {
+            type: 'bar',
+            data: {
+                labels: MONTHS,
+                datasets: [
+                    { label: 'Entradas', data: g('receita'), backgroundColor: '#bbf7d0', borderColor: CHART_COLORS.green, borderWidth: 1 },
+                    { label: 'Saidas',   data: d.totalSaidas.map(v => -v), backgroundColor: '#fecaca', borderColor: CHART_COLORS.red, borderWidth: 1 },
+                    { ...lineDataset('Saldo', d.saldo, CHART_COLORS.purple), type: 'line', order: 0 },
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } } } }
+        });
+
+        const saidas = ['cmv','outrosCustos','equipamentos','provisao','pessoal','beneficios','inss','proLabore','ferias','aluguel','marketing','ti','diversas','manutPredial','exames','despFin'];
+        const custosFCData = [
+            sumArr(g('cmv')), sumArr(g('pessoal')),
+            sumArr(g('inss')) + sumArr(g('beneficios')) + sumArr(g('ferias')),
+            sumArr(g('aluguel')), sumArr(g('marketing')), sumArr(g('ti')),
+            saidas.filter(k=>!['cmv','pessoal','inss','beneficios','ferias','aluguel','marketing','ti'].includes(k)).reduce((s,k)=>s+sumArr(g(k)),0)
+        ].map(v => Math.max(0, v));
+        fcCharts.custos = new Chart(document.getElementById('chart-fc-custos'), {
+            type: 'doughnut',
+            data: { labels: ['CMV/Logistica','Pessoal','INSS+Benef+Ferias','Aluguel','Marketing','TI','Outros'],
+                datasets: [{ data: custosFCData, backgroundColor: ['#dc2626','#2563eb','#7c3aed','#d97706','#db2777','#0d9488','#9e9890'], borderWidth: 2, borderColor: '#fff' }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+        });
+
+        const ticketData = g('ticketMedio').map((v,i) => v > 0 ? v : (g('pedidos')[i] > 0 ? g('receita')[i] / g('pedidos')[i] : 0));
+        fcCharts.ticket = new Chart(document.getElementById('chart-fc-ticket'), {
+            type: 'bar',
+            data: { labels: MONTHS, datasets: [{ label: 'Ticket Medio', data: ticketData, backgroundColor: CHART_COLORS.amber + '99', borderColor: CHART_COLORS.amber, borderWidth: 1 }] },
+            options: { responsive: true, plugins: { legend: { display: false } },
+                scales: { y: { ticks: { callback: v => 'R$' + v.toLocaleString('pt-BR',{maximumFractionDigits:0}) } } } }
+        });
+
+        // Table
+        renderFCTable(d);
+
+        // Insights
+        const insights = document.getElementById('fc-insights');
+        insights.innerHTML = '';
+        generateFCInsights(d).forEach(ins => {
+            const el = document.createElement('div'); el.className = 'insight-item ' + ins.type;
+            const dot = document.createElement('span'); dot.className = 'insight-dot';
+            dot.textContent = ins.type === 'positive' ? '▲' : ins.type === 'negative' ? '▼' : ins.type === 'warning' ? '!' : '●';
+            const txt = document.createElement('span'); txt.textContent = ins.text;
+            el.appendChild(dot); el.appendChild(txt); insights.appendChild(el);
+        });
+    }
+
+    function renderFCTable(d) {
+        const g = k => d[k] || new Array(12).fill(0);
+        const fmtCell = v => v === 0 ? '—' : (v < 0 ? '-' : '') + 'R$' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+        const table = document.createElement('table'); table.className = 'dre-tbl';
+        const thead = document.createElement('thead');
+        const hrow = document.createElement('tr');
+        ['Categoria',...MONTHS,'Total'].forEach(h => { const th = document.createElement('th'); th.textContent = h; hrow.appendChild(th); });
+        thead.appendChild(hrow); table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+
+        const addSection = lbl => {
+            const tr = document.createElement('tr'); tr.className = 'section-header';
+            const td = document.createElement('td'); td.colSpan = 14; td.textContent = lbl;
+            tr.appendChild(td); tbody.appendChild(tr);
+        };
+        const addRow = (lbl, arr, cls='', indent=true) => {
+            const tr = document.createElement('tr'); if (cls) tr.className = cls;
+            const tdL = document.createElement('td'); tdL.textContent = lbl; if (indent) tdL.className = 'indent'; tr.appendChild(tdL);
+            [...arr, sumArr(arr)].forEach(v => {
+                const td = document.createElement('td'); td.textContent = fmtCell(v);
+                if (v < 0) td.className = 'negative'; tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        };
+
+        addSection('ENTRADAS');
+        addRow('Pedidos', g('pedidos').map(v=>v||0));
+        addRow('Ticket Medio', g('ticketMedio'));
+        addRow('Receita de Vendas', g('receita'));
+        addSection('SAIDAS');
+        ['cmv','outrosCustos','equipamentos','provisao','pessoal','beneficios','inss','proLabore','ferias','aluguel','marketing','ti','diversas','manutPredial','exames','despFin']
+            .forEach(k => addRow(DRE_LABELS[k]||k, g(k).map(v=>-v)));
+        addRow('= Total Saidas', d.totalSaidas.map(v=>-v), 'calc-row', false);
+        addRow('= SALDO', d.saldo, 'resultado-row', false);
+
+        table.appendChild(tbody);
+        const container = document.getElementById('fc-table-container');
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+
+    function generateFCInsights(d) {
+        const g = k => d[k] || new Array(12).fill(0);
+        const insights = [];
+        const saldo = d.saldo;
+        const totalSaldo = sumArr(saldo);
+        insights.push({ text: 'Saldo acumulado no ano: ' + formatBRL(totalSaldo), type: totalSaldo >= 0 ? 'positive' : 'negative' });
+
+        const negativos = saldo.map((v,i) => v < 0 ? MONTHS[i] : null).filter(Boolean);
+        if (negativos.length) insights.push({ text: 'Meses com caixa negativo: ' + negativos.join(', '), type: 'negative' });
+        else insights.push({ text: 'Caixa positivo em todos os meses — otimo sinal!', type: 'positive' });
+
+        const maxIdx = saldo.indexOf(Math.max(...saldo));
+        const minIdx = saldo.indexOf(Math.min(...saldo));
+        insights.push({ text: 'Melhor saldo: ' + MONTHS[maxIdx] + ' (' + formatBRL(saldo[maxIdx]) + ')', type: 'positive' });
+        if (saldo[minIdx] < 0) insights.push({ text: 'Pior saldo: ' + MONTHS[minIdx] + ' (' + formatBRL(saldo[minIdx]) + ')', type: 'negative' });
+
+        const totalRec = sumArr(g('receita'));
+        const totalSaidas = sumArr(d.totalSaidas);
+        if (totalRec > 0) {
+            const pctSaidas = (totalSaidas / totalRec) * 100;
+            insights.push({ text: 'Saidas representam ' + formatPct(pctSaidas) + ' das entradas', type: pctSaidas > 95 ? 'warning' : pctSaidas > 85 ? 'neutral' : 'positive' });
+        }
+
+        const pedidosTotal = sumArr(g('pedidos'));
+        if (pedidosTotal > 0) {
+            const tkMedio = totalRec / pedidosTotal;
+            insights.push({ text: 'Ticket medio anual: ' + formatBRL(tkMedio) + ' (' + pedidosTotal.toLocaleString('pt-BR') + ' pedidos)', type: 'neutral' });
+        }
+
+        return insights;
+    }
+
+    // =========================================================
+    // LOCALSTORAGE — restore on load
+    // =========================================================
+    (function restoreFromStorage() {
+        try {
+            const dreRaw = localStorage.getItem('bc-dre');
+            const dreFile = localStorage.getItem('bc-dre-file');
+            if (dreRaw) renderDREDashboard(JSON.parse(dreRaw), dreFile || 'arquivo salvo');
+        } catch(e) { localStorage.removeItem('bc-dre'); }
+        try {
+            const fcRaw = localStorage.getItem('bc-fc');
+            const fcFile = localStorage.getItem('bc-fc-file');
+            if (fcRaw) renderFCDashboard(JSON.parse(fcRaw), fcFile || 'arquivo salvo');
+        } catch(e) { localStorage.removeItem('bc-fc'); }
+    })();
 </script>
 </body>
 </html>
