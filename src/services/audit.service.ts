@@ -35,6 +35,10 @@ export type AuditParams = {
   metadata?: Record<string, unknown>;
 };
 
+// Pending audit writes. Exposed to tests so they can await drain() to
+// prevent the next beforeEach from truncating a row that's still mid-flight.
+const pending = new Set<Promise<unknown>>();
+
 export function log(params: AuditParams): void {
   const data: Prisma.AuditLogUncheckedCreateInput = {
     userId: params.userId ?? null,
@@ -43,12 +47,10 @@ export function log(params: AuditParams): void {
     ip: params.ip ?? null,
     userAgent: params.userAgent ? params.userAgent.slice(0, 512) : null,
     // Prisma distinguishes `null` (not valid JSON) from `Prisma.JsonNull`
-    // (SQL NULL stored in a JSON column). Use JsonNull when we truly want
-    // to clear the column, otherwise serialize the object.
+    // (SQL NULL stored in a JSON column).
     metadata: params.metadata ? (params.metadata as Prisma.InputJsonValue) : Prisma.JsonNull,
   };
-  // Not awaited: audit must never block the caller.
-  prisma.auditLog
+  const promise = prisma.auditLog
     .create({ data })
     .catch((err) => {
       // eslint-disable-next-line no-console
@@ -56,5 +58,18 @@ export function log(params: AuditParams): void {
         action: params.action,
         err: err instanceof Error ? err.message : String(err),
       });
+    })
+    .finally(() => {
+      pending.delete(promise);
     });
+  pending.add(promise);
+  // Not awaited by the caller: audit must never block.
+}
+
+/**
+ * Wait for all in-flight audit writes to settle. Test-only helper so we
+ * can query audit_logs immediately after a request returns without races.
+ */
+export async function drain(): Promise<void> {
+  await Promise.all(pending);
 }

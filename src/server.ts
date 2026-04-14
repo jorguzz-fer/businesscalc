@@ -112,20 +112,24 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ---- Global rate limit (per-IP) ----
   // Per-route limits in auth.routes.ts will override with stricter thresholds.
-  await app.register(rateLimit, {
-    global: true,
-    max: 100,
-    timeWindow: '1 minute',
-    hook: 'onRequest',
-    // Log but don't ban: 429 response already does the throttling.
-    errorResponseBuilder: (_req, context) => ({
-      statusCode: 429,
-      error: 'Too Many Requests',
-      message: `Muitas requisições. Tente novamente em ${Math.ceil(
-        context.ttl / 1000,
-      )} segundos.`,
-    }),
-  });
+  // Disabled in test mode — supertest always hits the same IP so throttling
+  // fires almost immediately and poisons the suite. We cover the limit
+  // itself in a dedicated test that deliberately hammers the endpoint.
+  if (!isTest) {
+    await app.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: '1 minute',
+      hook: 'onRequest',
+      errorResponseBuilder: (_req, context) => ({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `Muitas requisições. Tente novamente em ${Math.ceil(
+          context.ttl / 1000,
+        )} segundos.`,
+      }),
+    });
+  }
 
   // CSRF enforcement: not a Fastify plugin. We implement the double-submit
   // cookie pattern ourselves in middleware/requireAuth.ts — the server
