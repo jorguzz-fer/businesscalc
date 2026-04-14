@@ -1703,6 +1703,13 @@
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
+                // Fase 1: client-side parsing is now only a FALLBACK
+                // preview. Persistent storage goes through the server via
+                // app-upload.js which intercepts the file input BEFORE this
+                // handler runs when a period is selected. We keep this
+                // code path so ?debug flows still render something locally,
+                // but we no longer write to localStorage — server is the
+                // source of truth.
                 const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
                 if (tab === 'dre') {
                     const dreWs = wb.Sheets['DRE'] || wb.Sheets[wb.SheetNames[0]];
@@ -1711,15 +1718,11 @@
                     const metas = metasWs ? parseMetas(metasWs) : {};
                     const computed = computeDRE(raw);
                     computed.metas = metas;
-                    localStorage.setItem('bc-dre', JSON.stringify(computed));
-                    localStorage.setItem('bc-dre-file', String(file.name).replace(/[<>"'&]/g, ''));
                     renderDREDashboard(computed, file.name);
                 } else {
                     const fcWs = wb.Sheets['FC'] || wb.Sheets[wb.SheetNames[0]];
                     const raw = parseSheetByLabel(fcWs, { ...DRE_LABELS, ...FC_EXTRA_LABELS });
                     const computed = computeFC(raw);
-                    localStorage.setItem('bc-fc', JSON.stringify(computed));
-                    localStorage.setItem('bc-fc-file', String(file.name).replace(/[<>"'&]/g, ''));
                     renderFCDashboard(computed, file.name);
                 }
             } catch (ex) {
@@ -2238,20 +2241,13 @@
     }
 
     // =========================================================
-    // LOCALSTORAGE — restore on load
+    // (Removed) LOCALSTORAGE restore block
     // =========================================================
-    (function restoreFromStorage() {
-        try {
-            const dreRaw = localStorage.getItem('bc-dre');
-            const dreFile = localStorage.getItem('bc-dre-file');
-            if (dreRaw) renderDREDashboard(JSON.parse(dreRaw), dreFile || 'arquivo salvo');
-        } catch(e) { localStorage.removeItem('bc-dre'); }
-        try {
-            const fcRaw = localStorage.getItem('bc-fc');
-            const fcFile = localStorage.getItem('bc-fc-file');
-            if (fcRaw) renderFCDashboard(JSON.parse(fcRaw), fcFile || 'arquivo salvo');
-        } catch(e) { localStorage.removeItem('bc-fc'); }
-    })();
+    // Fase 1 replaced localStorage-based persistence with server-backed
+    // periods. The dashboard is populated via app-period-loader.js when
+    // the user selects a period, and writes go through the /api/periods
+    // endpoints. Any lingering localStorage data from the v1 SPA is
+    // surfaced by app-migrate.js as an "import" banner, not auto-loaded.
 
     // ---- User badge + logout ----
     (function () {
@@ -2281,5 +2277,6 @@
 <script src="/assets/app-period-loader.js"></script>
 <script src="/assets/app-upload.js"></script>
 <script src="/assets/app-edit.js"></script>
+<script src="/assets/app-migrate.js"></script>
 </body>
 </html>
