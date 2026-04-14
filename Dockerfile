@@ -1,22 +1,36 @@
 # ==========================================
 # BusinessCalc v2 — Production Dockerfile
 # Multi-stage build: minimize final image size and attack surface.
+#
+# Base image: node:20-slim (Debian 12 / bookworm-slim).
+# We deliberately chose slim over alpine because:
+#   - Prisma 5 ships precompiled engines for debian-openssl-3.0.x but has
+#     recurring issues on alpine/musl (libssl detection failures,
+#     "Could not parse schema engine response" errors).
+#   - argon2 native module links cleanly against glibc on Debian.
+#   - 60 MB size penalty (180 → 240 MB compressed) is acceptable for the
+#     tradeoff in reliability and maintenance cost.
 # ==========================================
 
 # ---------- Stage 1: Builder ----------
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Install build toolchain only — argon2 needs node-gyp + Python at install.
-# Alpine keeps the image small; we discard all of this in stage 2.
-RUN apk add --no-cache python3 make g++
+# argon2 needs python/make/g++ to compile its native addon.
+# openssl is required by Prisma's schema engine.
+# ca-certificates keeps outbound HTTPS (npm registry, etc.) working.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 \
+      make \
+      g++ \
+      openssl \
+      ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install deps with a deterministic lockfile. We copy ONLY package files first
-# so Docker can cache this layer when only source code changes.
+# Install deps with a deterministic lockfile. Package files go first so
+# Docker caches this layer when only source code changes.
 COPY package.json package-lock.json* ./
-# Use `npm ci` once lockfile is committed. For initial bootstrap without a
-# lockfile, fall back to `npm install`.
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Copy prisma schema and generate client (types used at compile time).
@@ -33,10 +47,18 @@ RUN npm prune --omit=dev
 
 
 # ---------- Stage 2: Runner ----------
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
+
+# Install only what runtime needs: openssl for Prisma at runtime, wget for
+# HEALTHCHECK (Debian slim doesn't include wget by default).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      openssl \
+      ca-certificates \
+      wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Security: run as non-root user
-RUN addgroup -S app && adduser -S app -G app
+RUN groupadd -r app && useradd -r -g app -s /usr/sbin/nologin app
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -57,5 +79,5 @@ EXPOSE 3000
 # no partial state reaches production.
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1

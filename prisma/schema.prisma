@@ -10,7 +10,13 @@
 // No encrypted columns exist yet; this file is the baseline.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" = whatever the developer's machine uses (for `npm run dev`).
+  // "debian-openssl-3.0.x" = Debian 12 / Ubuntu 22.04+ with OpenSSL 3.x
+  // which is what node:20-slim (our production runner) ships. Listing both
+  // means `prisma generate` produces engines for both, avoiding runtime
+  // download attempts on the production container.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
