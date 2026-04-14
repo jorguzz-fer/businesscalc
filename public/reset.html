@@ -49,6 +49,8 @@
       form.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
     }
 
+    window.bindPasswordToggle(document.getElementById('password'));
+    window.bindPasswordToggle(document.getElementById('confirm'));
     window.bindStrengthMeter(
       document.getElementById('password'),
       document.getElementById('strength-fill'),

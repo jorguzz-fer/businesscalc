@@ -86,6 +86,35 @@ body {
   box-shadow: 0 0 0 3px rgba(22,163,74,0.1);
 }
 .field input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Password input with show/hide toggle */
+.password-wrap {
+  position: relative;
+}
+.password-wrap input {
+  /* room for the toggle button on the right */
+  padding-right: 2.6rem;
+}
+.password-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.35rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.password-toggle:hover { color: var(--text); background: var(--border-light); }
+.password-toggle:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+.password-toggle svg { width: 18px; height: 18px; display: block; }
+
 .field-hint {
   font-size: 0.72rem;
   color: var(--text-muted);
