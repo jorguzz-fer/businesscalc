@@ -75,7 +75,18 @@ export async function buildServer(): Promise<FastifyInstance> {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+        // 'unsafe-inline' on scriptSrc: pragmatic MVP compromise. All
+        // inline <script> blocks on our pages are first-party (no
+        // templated user content is ever injected into a script context),
+        // and we have defense-in-depth via:
+        //   - zod strict() on every request body (no mass assignment)
+        //   - textContent (not innerHTML) for all user-supplied data
+        //   - SameSite=Strict cookies + CSRF tokens
+        //   - httpOnly session cookie (not stealable via XSS either way)
+        // Phase 3 TODO: extract inline scripts to external files and
+        // adopt CSP nonces (or hashes) to restore script-src strictness.
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+        scriptSrcAttr: ["'unsafe-inline'"], // for onclick/onchange handlers in app.html
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         imgSrc: ["'self'", 'data:'],
