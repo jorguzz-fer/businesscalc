@@ -14,9 +14,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
-import csrfProtection from '@fastify/csrf-protection';
 import formbody from '@fastify/formbody';
 import { config, isDevelopment, isTest } from './config.js';
+import { authRoutes } from './routes/auth.routes.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -115,30 +115,20 @@ export async function buildServer(): Promise<FastifyInstance> {
     }),
   });
 
-  // ---- CSRF protection (double-submit cookie pattern) ----
-  // Activated here so the plugin registers; actual enforcement happens in the
-  // requireAuth middleware (Task 0.7) which validates the token for
-  // POST/PUT/PATCH/DELETE on authenticated routes.
-  await app.register(csrfProtection, {
-    sessionPlugin: '@fastify/cookie',
-    cookieOpts: {
-      httpOnly: false, // JS must read it to send as header (double-submit)
-      secure: !isDevelopment,
-      sameSite: 'strict',
-      path: '/',
-    },
-    getToken: (req) => {
-      const header = req.headers['x-csrf-token'];
-      return typeof header === 'string' ? header : undefined;
-    },
-  });
+  // CSRF enforcement: not a Fastify plugin. We implement the double-submit
+  // cookie pattern ourselves in middleware/requireAuth.ts — the server
+  // compares request.headers['x-csrf-token'] against the token stored in
+  // the session row in Postgres. See that file for the rationale.
 
-  // ---- Health check ----
+  // ---- Health check (unauthenticated; safe to expose) ----
   app.get('/api/health', async () => ({
     status: 'ok',
     env: config.NODE_ENV,
     timestamp: new Date().toISOString(),
   }));
+
+  // ---- Auth routes ----
+  await app.register(authRoutes);
 
   // ---- Generic error handler: never leak stack traces in production ----
   app.setErrorHandler((error, request, reply) => {
