@@ -1,7 +1,9 @@
 # BusinessCalc — Plano de Implementação SaaS
 
 > **Status**: Planejamento aprovado, aguardando início da Fase 0.
-> **Branch de desenvolvimento**: `claude/continue-businesscalc-Uk8Mb`
+> **Estratégia de repo**: Mantido no mesmo repo `jorguzz-fer/businesscalc`. `main` deploya a SPA v1 atual até a Fase 0 fazer merge, quando o Dockerfile troca de nginx para Node+Fastify. SaaS desenvolvido em branches `claude/saas-faseN-*`.
+> **Branch atual**: `claude/continue-businesscalc-Uk8Mb` (contém PLAN.md + DRE/FC v1)
+> **Próxima branch**: `claude/saas-fase0-fundacao` (começa Task 0.1)
 > **Última atualização**: 2026-04-14
 
 ---
