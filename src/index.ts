@@ -9,6 +9,7 @@
  */
 import { buildServer } from './server.js';
 import { config } from './config.js';
+import { disconnect as dbDisconnect } from './db.js';
 
 async function main(): Promise<void> {
   const app = await buildServer();
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
     app.log.info({ signal }, 'shutting down');
     try {
       await app.close();
+      await dbDisconnect();
       process.exit(0);
     } catch (err) {
       app.log.error({ err }, 'error during shutdown');
