@@ -15,6 +15,13 @@
 # ---------- Stage 1: Builder ----------
 FROM node:20-slim AS builder
 
+# Force development mode during build regardless of what the orchestrator
+# (Coolify/CI) passes as NODE_ENV. We NEED devDependencies (typescript,
+# tsx, vitest, prisma CLI) to compile the app. The runner stage below sets
+# NODE_ENV=production separately, so the final image still runs in prod mode.
+ENV NODE_ENV=development
+ENV CI=true
+
 WORKDIR /app
 
 # argon2 needs python/make/g++ to compile its native addon.
