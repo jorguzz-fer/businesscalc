@@ -15,8 +15,20 @@ import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import formbody from '@fastify/formbody';
+import staticPlugin from '@fastify/static';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config, isDevelopment, isTest } from './config.js';
 import { authRoutes } from './routes/auth.routes.js';
+
+// When bundled to dist/server.js, __dirname would be dist/. We resolve
+// the public/ folder relative to the project root (one level up from
+// dist). In ESM we compute this from import.meta.url.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// src/server.ts at dev time OR dist/server.js at runtime — both one level
+// below the project root, so ../public works in both cases.
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -129,6 +141,19 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ---- Auth routes ----
   await app.register(authRoutes);
+
+  // ---- Static serving (public/) ----
+  // Serves login.html, signup.html, app.html, assets/, etc.
+  // wildcard:false so /api/* doesn't get intercepted — our route handlers
+  // above take priority and this fallback serves everything else.
+  await app.register(staticPlugin, {
+    root: PUBLIC_DIR,
+    wildcard: false,
+    index: ['index.html'],
+    prefix: '/',
+    cacheControl: true,
+    maxAge: isDevelopment ? 0 : 3600,
+  });
 
   // ---- Generic error handler: never leak stack traces in production ----
   app.setErrorHandler((error, request, reply) => {

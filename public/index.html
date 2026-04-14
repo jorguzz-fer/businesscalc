@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>BusinessCalc</title>
+  <meta http-equiv="refresh" content="0; url=/app.html">
+</head>
+<body>
+  <script>
+    // Fast path: decide destination via /api/auth/me before paint.
+    (async function () {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        window.location.replace(res.ok ? '/app.html' : '/login.html');
+      } catch (_e) {
+        window.location.replace('/login.html');
+      }
+    })();
+  </script>
+  <noscript><p>Redirecionando... <a href="/app.html">BusinessCalc</a></p></noscript>
+</body>
+</html>

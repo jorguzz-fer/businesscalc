@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Esqueci a senha — BusinessCalc</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body>
+  <div class="auth-card">
+    <h1 class="auth-logo">Business<span>Calc</span></h1>
+    <p class="auth-subtitle">Recuperar acesso</p>
+
+    <div id="alert" class="alert hidden"></div>
+
+    <form id="form" class="form" novalidate>
+      <div class="field">
+        <label for="email">Email da conta</label>
+        <input type="email" id="email" name="email" autocomplete="email" required>
+        <div class="field-hint">Enviaremos um link para você redefinir a senha.</div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="submit">Enviar link</button>
+    </form>
+
+    <div class="auth-links">
+      <a href="/login.html">Voltar ao login</a>
+    </div>
+  </div>
+
+  <script src="/assets/auth.js"></script>
+  <script>
+    const form = document.getElementById('form');
+    const submit = document.getElementById('submit');
+    const alert = document.getElementById('alert');
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      alert.classList.add('hidden');
+      submit.disabled = true;
+      submit.textContent = 'Enviando...';
+      try {
+        const body = { email: document.getElementById('email').value.trim() };
+        const data = await window.api('POST', '/api/auth/forgot-password', body);
+        alert.className = 'alert alert-success';
+        alert.textContent = data.message || 'Se o email estiver cadastrado, enviaremos um link.';
+        alert.classList.remove('hidden');
+        form.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+      } catch (err) {
+        alert.className = 'alert alert-error';
+        alert.textContent = err.message || 'Erro ao processar solicitação';
+        alert.classList.remove('hidden');
+        submit.disabled = false;
+        submit.textContent = 'Enviar link';
+      }
+    });
+  </script>
+</body>
+</html>

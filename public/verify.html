@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verificação de email — BusinessCalc</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body>
+  <div class="auth-card">
+    <h1 class="auth-logo">Business<span>Calc</span></h1>
+    <div id="status" class="status-icon">⏳</div>
+    <p class="auth-subtitle" id="title" style="text-align:center;">Verificando...</p>
+    <div id="msg" class="alert alert-info" style="text-align:center;"></div>
+    <div class="auth-links" style="justify-content:center;">
+      <a href="/login.html">Ir para login</a>
+    </div>
+  </div>
+
+  <script src="/assets/auth.js"></script>
+  <script>
+    const status = window.getQueryParam('status');
+    const iconEl = document.getElementById('status');
+    const titleEl = document.getElementById('title');
+    const msgEl = document.getElementById('msg');
+
+    if (status === 'ok') {
+      iconEl.textContent = '✅';
+      titleEl.textContent = 'Email verificado!';
+      msgEl.className = 'alert alert-success';
+      msgEl.textContent = 'Sua conta foi ativada. Faça login para começar.';
+      setTimeout(function () { window.location.href = '/login.html?verified=1'; }, 2000);
+    } else if (status === 'expired') {
+      iconEl.textContent = '⏱️';
+      titleEl.textContent = 'Link expirado';
+      msgEl.className = 'alert alert-error';
+      msgEl.textContent = 'O link de verificação expirou. Faça login para receber um novo.';
+    } else {
+      iconEl.textContent = '❌';
+      titleEl.textContent = 'Link inválido';
+      msgEl.className = 'alert alert-error';
+      msgEl.textContent = 'O link de verificação é inválido.';
+    }
+  </script>
+</body>
+</html>

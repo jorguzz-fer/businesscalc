@@ -4,6 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BusinessCalc — Painel Financeiro</title>
+    <script>
+        // Auth gate — runs BEFORE the page renders. If the user isn't
+        // logged in, redirect to /login.html immediately. We do a
+        // synchronous XHR on purpose so the protected UI never flashes.
+        (function () {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/auth/me', false); // synchronous
+            xhr.withCredentials = true;
+            try { xhr.send(); } catch (_e) {}
+            if (xhr.status !== 200) {
+                window.location.replace('/login.html');
+                // Stop further script execution by throwing; the replace
+                // navigation will happen but the throw short-circuits any
+                // subsequent inline script on this page.
+                throw new Error('redirecting to /login.html');
+            }
+            // Stash the current user for the script section below.
+            try { window.__USER__ = JSON.parse(xhr.responseText); } catch (_e) {}
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -713,9 +733,15 @@
 <body>
 <div class="app">
 
-    <header class="header">
-        <h1>Business<span>Calc</span></h1>
-        <p>Painel de indicadores financeiros para tomada de decisao</p>
+    <header class="header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div>
+            <h1>Business<span>Calc</span></h1>
+            <p>Painel de indicadores financeiros para tomada de decisao</p>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.35rem;font-size:0.8rem;">
+            <span id="user-info" style="color:var(--text-secondary);"></span>
+            <button id="btn-logout" type="button" style="background:none;border:1px solid var(--border);color:var(--text-secondary);padding:0.35rem 0.8rem;border-radius:var(--radius-sm);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:0.75rem;font-weight:600;">Sair</button>
+        </div>
     </header>
 
     <!-- Tab Navigation -->
@@ -2221,6 +2247,29 @@
             const fcFile = localStorage.getItem('bc-fc-file');
             if (fcRaw) renderFCDashboard(JSON.parse(fcRaw), fcFile || 'arquivo salvo');
         } catch(e) { localStorage.removeItem('bc-fc'); }
+    })();
+
+    // ---- User badge + logout ----
+    (function () {
+        const user = window.__USER__;
+        if (user) {
+            const badge = document.getElementById('user-info');
+            if (badge) badge.textContent = user.name || user.email;
+        }
+        document.getElementById('btn-logout').addEventListener('click', async function () {
+            try {
+                const csrf = (function (n) {
+                    const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)'));
+                    return m ? decodeURIComponent(m[1]) : null;
+                })('csrf');
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+                });
+            } catch (_e) { /* ignore */ }
+            window.location.href = '/login.html';
+        });
     })();
 </script>
 </body>
