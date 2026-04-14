@@ -1,0 +1,169 @@
+/**
+ * Fastify server factory.
+ *
+ * Security plugins applied here as baseline (vibesec-aligned):
+ *   - @fastify/helmet: strict CSP, HSTS, X-Frame-Options, X-Content-Type-Options
+ *   - @fastify/cookie: parse + sign cookies with SESSION_SECRET
+ *   - @fastify/rate-limit: global throttling (per-route limits overridden later)
+ *   - @fastify/csrf-protection: double-submit cookie pattern (activated in Task 0.7)
+ *
+ * Routes are NOT registered here. Each route module calls `registerRoutes(app)`
+ * so the server stays a thin composition root.
+ */
+import Fastify, { type FastifyInstance } from 'fastify';
+import helmet from '@fastify/helmet';
+import cookie from '@fastify/cookie';
+import rateLimit from '@fastify/rate-limit';
+import csrfProtection from '@fastify/csrf-protection';
+import formbody from '@fastify/formbody';
+import { config, isDevelopment, isTest } from './config.js';
+
+export async function buildServer(): Promise<FastifyInstance> {
+  const app = Fastify({
+    logger: isTest
+      ? false
+      : {
+          level: config.LOG_LEVEL,
+          transport: isDevelopment
+            ? {
+                target: 'pino-pretty',
+                options: {
+                  translateTime: 'HH:MM:ss Z',
+                  ignore: 'pid,hostname',
+                },
+              }
+            : undefined,
+          // Never log Authorization header, Cookie, or password fields.
+          redact: {
+            paths: [
+              'req.headers.authorization',
+              'req.headers.cookie',
+              'req.body.password',
+              'req.body.newPassword',
+              'req.body.token',
+              'res.headers["set-cookie"]',
+            ],
+            censor: '[REDACTED]',
+          },
+        },
+    trustProxy: true, // Coolify/Traefik is in front; trust X-Forwarded-* headers
+    bodyLimit: 1024 * 1024, // 1 MB default; multipart endpoints override to 10 MB
+    disableRequestLogging: false,
+    ajv: {
+      customOptions: {
+        removeAdditional: 'all',
+        coerceTypes: false,
+        useDefaults: true,
+      },
+    },
+  });
+
+  // ---- Security Headers (Helmet) ----
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        objectSrc: ["'none'"],
+      },
+    },
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    // Browsers deprecated X-Frame-Options in favor of CSP frame-ancestors above,
+    // but helmet still sets it as defense-in-depth.
+  });
+
+  // ---- Cookie parsing (required by CSRF plugin) ----
+  await app.register(cookie, {
+    secret: config.SESSION_SECRET,
+    parseOptions: {
+      httpOnly: true,
+      secure: !isDevelopment,
+      sameSite: 'strict',
+      path: '/',
+    },
+  });
+
+  // ---- Form body parsing (for HTML forms posting application/x-www-form-urlencoded) ----
+  await app.register(formbody);
+
+  // ---- Global rate limit (per-IP) ----
+  // Per-route limits in auth.routes.ts will override with stricter thresholds.
+  await app.register(rateLimit, {
+    global: true,
+    max: 100,
+    timeWindow: '1 minute',
+    hook: 'onRequest',
+    // Log but don't ban: 429 response already does the throttling.
+    errorResponseBuilder: (_req, context) => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: `Muitas requisições. Tente novamente em ${Math.ceil(
+        context.ttl / 1000,
+      )} segundos.`,
+    }),
+  });
+
+  // ---- CSRF protection (double-submit cookie pattern) ----
+  // Activated here so the plugin registers; actual enforcement happens in the
+  // requireAuth middleware (Task 0.7) which validates the token for
+  // POST/PUT/PATCH/DELETE on authenticated routes.
+  await app.register(csrfProtection, {
+    sessionPlugin: '@fastify/cookie',
+    cookieOpts: {
+      httpOnly: false, // JS must read it to send as header (double-submit)
+      secure: !isDevelopment,
+      sameSite: 'strict',
+      path: '/',
+    },
+    getToken: (req) => {
+      const header = req.headers['x-csrf-token'];
+      return typeof header === 'string' ? header : undefined;
+    },
+  });
+
+  // ---- Health check ----
+  app.get('/api/health', async () => ({
+    status: 'ok',
+    env: config.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  }));
+
+  // ---- Generic error handler: never leak stack traces in production ----
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error({ err: error }, 'unhandled request error');
+    const statusCode = error.statusCode ?? 500;
+    // Fastify validation errors are safe to expose (the schema is ours)
+    if (error.validation) {
+      reply.code(400).send({ error: 'Bad Request', message: error.message });
+      return;
+    }
+    reply
+      .code(statusCode >= 500 ? 500 : statusCode)
+      .send({
+        error: statusCode >= 500 ? 'Internal Server Error' : error.name,
+        message:
+          statusCode >= 500
+            ? 'Erro ao processar solicitação'
+            : error.message,
+      });
+  });
+
+  // ---- 404 ----
+  app.setNotFoundHandler((_req, reply) => {
+    reply.code(404).send({ error: 'Not Found' });
+  });
+
+  return app;
+}

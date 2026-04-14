@@ -1,0 +1,50 @@
+# ==========================================
+# BusinessCalc v2 — Local Development
+# Usage:
+#   docker compose up -d postgres   # start only the DB
+#   docker compose up               # start everything (app rebuilds on code changes if you mount src)
+#
+# Production deploy is handled by Coolify with its own config — this compose
+# file is for local dev only.
+# ==========================================
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: businesscalc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: businesscalc
+      POSTGRES_PASSWORD: businesscalc
+      POSTGRES_DB: businesscalc
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U businesscalc -d businesscalc"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # App is optional in dev — most devs run `npm run dev` directly against the
+  # postgres container above for faster iteration.
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: businesscalc-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    # Optional: uncomment for live reload when hacking on the container.
+    # volumes:
+    #   - ./src:/app/src:ro
+
+volumes:
+  postgres_data:
+    name: businesscalc_postgres_data

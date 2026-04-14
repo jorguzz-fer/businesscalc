@@ -1,0 +1,168 @@
+// BusinessCalc v2 — Prisma schema
+//
+// All IDs are UUID v4 (non-guessable, per vibesec access-control guidance).
+// Soft-delete is intentionally NOT used for core models — hard delete with
+// cascade keeps the data minimization story clean for LGPD.
+//
+// Column-level AES-256-GCM encryption (Phase 3) will target:
+//   - user.totpSecret, user.backupCodes (when 2FA lands)
+//   - audit_logs.metadata if ever containing PII
+// No encrypted columns exist yet; this file is the baseline.
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" = whatever the developer's machine uses (for `npm run dev`).
+  // "debian-openssl-3.0.x" = Debian 12 / Ubuntu 22.04+ with OpenSSL 3.x
+  // which is what node:20-slim (our production runner) ships. Listing both
+  // means `prisma generate` produces engines for both, avoiding runtime
+  // download attempts on the production container.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Users ----------
+// `emailVerified` + `verifyToken` gate the first login (Task 0.6).
+// `failedLoginCount` + `lockedUntil` implement account lockout after
+// 10 failed attempts (vibesec password/brute-force guidance).
+// `termsAcceptedAt` records explicit LGPD consent at signup time.
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String    @map("password_hash")
+  name               String?
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  verifyToken        String?   @unique @map("verify_token")
+  verifyTokenExpires DateTime? @map("verify_token_expires")
+  resetToken         String?   @unique @map("reset_token")
+  resetTokenExpires  DateTime? @map("reset_token_expires")
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  lockedUntil        DateTime? @map("locked_until")
+  termsAcceptedAt    DateTime? @map("terms_accepted_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  lastLoginAt        DateTime? @map("last_login_at")
+
+  sessions  Session[]
+  periods   Period[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+// ---------- Sessions ----------
+// Server-side session table so we can revoke (logout all, password reset, etc).
+// `csrfToken` is issued per-session and validated by requireAuth on state-
+// changing requests (double-submit cookie pattern).
+model Session {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  csrfToken  String   @map("csrf_token")
+  ip         String?
+  userAgent  String?  @map("user_agent") @db.VarChar(512)
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ---------- Periods ----------
+// A "period" is one instance of DRE or FC for a given year. Users can have
+// unlimited periods (throttled per plan in Phase 4 billing).
+// Unique (userId, name, type) prevents duplicates like "DRE 2024" twice.
+enum PeriodType {
+  DRE
+  FC
+
+  @@map("period_type")
+}
+
+enum PeriodStatus {
+  DRAFT
+  FINALIZED
+
+  @@map("period_status")
+}
+
+model Period {
+  id        String       @id @default(uuid())
+  userId    String       @map("user_id")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String       @db.VarChar(80)
+  year      Int
+  type      PeriodType
+  status    PeriodStatus @default(DRAFT)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  entries Entry[]
+  meta    Meta?
+
+  @@unique([userId, name, type])
+  @@index([userId])
+  @@map("periods")
+}
+
+// ---------- Entries ----------
+// One row per category per period. `monthly` stores the 12 monthly values as
+// a JSON array of numbers. Storing as JSON (not 12 columns or 12 rows) keeps
+// the query simple and round-trips cleanly to the UI which already expects
+// an array of 12.
+model Entry {
+  id        String   @id @default(uuid())
+  periodId  String   @map("period_id")
+  period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  category  String   @db.VarChar(64)
+  monthly   Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([periodId, category])
+  @@map("entries")
+}
+
+// ---------- Metas ----------
+// Annual targets per period. All fields optional: UI lets users fill in
+// whichever metrics they care about.
+model Meta {
+  id             String   @id @default(uuid())
+  periodId       String   @unique @map("period_id")
+  period         Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  receitaAnual   Decimal? @map("receita_anual")    @db.Decimal(14, 2)
+  lucroAnual     Decimal? @map("lucro_anual")      @db.Decimal(14, 2)
+  margemBrutaPct Decimal? @map("margem_bruta_pct") @db.Decimal(5, 2)
+  margemOpPct    Decimal? @map("margem_op_pct")    @db.Decimal(5, 2)
+  margemLiqPct   Decimal? @map("margem_liq_pct")   @db.Decimal(5, 2)
+  ticketMedio    Decimal? @map("ticket_medio")     @db.Decimal(14, 2)
+  pedidosMes     Int?     @map("pedidos_mes")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("metas")
+}
+
+// ---------- Audit Log ----------
+// Append-only event stream. `userId` is nullable so we can preserve log
+// entries after account deletion (LGPD: data access + pattern analysis
+// for 2-year retention, then purged). The `metadata` column intentionally
+// has no PII today; when we add any, it will be encrypted (Phase 3).
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   @db.VarChar(64)
+  resource  String?  @db.VarChar(128)
+  ip        String?
+  userAgent String?  @map("user_agent") @db.VarChar(512)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
