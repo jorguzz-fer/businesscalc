@@ -1,3 +1,56 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Env / secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Prisma
+prisma/migrations/dev.db*
+prisma/*.db
+prisma/*.db-journal
+
+# OS
 .DS_Store
-node_modules
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage / tests
+coverage/
+.nyc_output/
+.vitest-cache/
+
+# Logs
+logs/
+*.log
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# Uploaded files (memory-processed only in this app; never committed)
+uploads/
+tmp/
+
+# Claude Code session plans (not part of product)
+.claude/plans/
+
+# Legacy
 server.js

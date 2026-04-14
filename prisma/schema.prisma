@@ -1,0 +1,12 @@
+// BusinessCalc v2 — Prisma schema
+// Models are defined in Task 0.2. This file exists so the scaffold Dockerfile
+// can run `prisma generate` successfully.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
