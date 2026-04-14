@@ -1,17 +1,15 @@
 /**
  * XLSX upload + template download routes.
  *
- * Security (vibesec file-upload):
- *   - multipart body capped at 10 MB via @fastify/multipart config.
- *   - MIME + extension + magic bytes all checked.
- *   - File processed entirely in memory (toBuffer); never written to
- *     disk, never a path constructed from the uploaded filename.
- *   - Uploaded filename is read for the audit log only after sanitizing
- *     (strip angle brackets, quotes, control chars, length cap).
+ * The upload now resolves spreadsheet labels to PeriodCategory ids via
+ * exact label match against the period's category list. If the user
+ * renamed a category and uploads the OLD-label template, those rows are
+ * skipped silently (we don't want to clobber renamed items with a fresh
+ * upload). User can either keep labels in sync or use the per-period
+ * template generator (next step) which uses their current labels.
  *
- * The upload path also enforces ownership of the target period — an
- * attacker can't overwrite another user's period by POSTing an xlsx to
- * /api/periods/SOMEONE_ELSES_ID/upload.
+ * Security same as before: 10 MB cap, magic-byte check, MIME +
+ * extension, ownership + finalize gates BEFORE parsing.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import multipart from '@fastify/multipart';
@@ -27,11 +25,10 @@ import {
   type ParsedWorkbook,
 } from '../services/xlsx.service.js';
 import {
-  upsertForPeriod as upsertEntries,
+  bulkUpdateMonthly,
   PeriodFinalizedError,
 } from '../services/entry.service.js';
 import { upsertForPeriod as upsertMeta } from '../services/meta.service.js';
-import { UpsertEntriesSchema } from '../schemas/entry.schema.js';
 import * as audit from '../services/audit.service.js';
 
 function ipOf(request: FastifyRequest): string {
@@ -40,9 +37,7 @@ function ipOf(request: FastifyRequest): string {
 }
 
 function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[<>"'&\0\r\n]/g, '')
-    .slice(0, 200);
+  return name.replace(/[<>"'&\0\r\n]/g, '').slice(0, 200);
 }
 
 export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
@@ -50,16 +45,12 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
     limits: {
       fileSize: MAX_UPLOAD_BYTES,
       files: 1,
-      // Fields the client shouldn't be sending in the multipart form.
       fields: 0,
       fieldSize: 0,
     },
   });
 
   // ---------- GET /api/template.xlsx ----------
-  // Public-ish — we still require auth so only logged-in users can get
-  // the canonical structure. Prevents template becoming an SEO-indexed
-  // file anyone can find.
   app.get(
     '/api/template.xlsx',
     { preHandler: requireAuth },
@@ -74,13 +65,10 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // ---------- POST /api/periods/:id/upload ----------
-  // Multipart upload: accepts a single xlsx file, parses the DRE/FC/Metas
-  // sheets, upserts into the target period.
   app.post<{ Params: { id: string } }>(
     '/api/periods/:id/upload',
     { preHandler: requireAuth },
     async (request, reply) => {
-      // Ownership check FIRST — no work if not owner.
       const period = await prisma.period.findFirst({
         where: { id: request.params.id, userId: request.user!.id },
         select: { id: true, type: true, status: true },
@@ -97,15 +85,7 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      // Collect the file. @fastify/multipart gives us an iterable; we
-      // expect exactly one entry.
-      let uploaded: {
-        filename: string;
-        mimetype: string;
-        buffer: Buffer;
-        truncated: boolean;
-      } | null = null;
-
+      let uploaded: { filename: string; mimetype: string; buffer: Buffer; truncated: boolean } | null = null;
       try {
         const part = await request.file();
         if (!part) {
@@ -113,9 +93,7 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
           return;
         }
         const chunks: Buffer[] = [];
-        for await (const chunk of part.file) {
-          chunks.push(chunk as Buffer);
-        }
+        for await (const chunk of part.file) chunks.push(chunk as Buffer);
         uploaded = {
           filename: part.filename ?? 'unknown.xlsx',
           mimetype: part.mimetype ?? 'unknown',
@@ -129,23 +107,14 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (uploaded.truncated) {
-        reply.code(413).send({
-          error: 'Payload Too Large',
-          message: 'Arquivo maior que 10 MB',
-        });
+        reply.code(413).send({ error: 'Payload Too Large', message: 'Arquivo maior que 10 MB' });
         return;
       }
 
-      // Defense in depth: extension + MIME + magic bytes (inside validateBuffer).
       const nameOk = uploaded.filename.toLowerCase().endsWith('.xlsx');
-      const mimeOk =
-        uploaded.mimetype === XLSX_MIME ||
-        uploaded.mimetype === 'application/octet-stream'; // some browsers don't set MIME
+      const mimeOk = uploaded.mimetype === XLSX_MIME || uploaded.mimetype === 'application/octet-stream';
       if (!nameOk || !mimeOk) {
-        reply.code(415).send({
-          error: 'Unsupported Media Type',
-          message: 'Apenas arquivos .xlsx são aceitos',
-        });
+        reply.code(415).send({ error: 'Unsupported Media Type', message: 'Apenas arquivos .xlsx são aceitos' });
         return;
       }
 
@@ -166,9 +135,8 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      // Pick the right sheet for this period type.
-      const sheet = period.type === 'DRE' ? parsed.dre : parsed.fc;
-      if (!sheet || Object.keys(sheet).length === 0) {
+      const sheetByLabel = period.type === 'DRE' ? parsed.dreByLabel : parsed.fcByLabel;
+      if (!sheetByLabel || Object.keys(sheetByLabel).length === 0) {
         reply.code(400).send({
           error: 'Bad Request',
           message: `Planilha não contém aba "${period.type}" ou está vazia`,
@@ -176,45 +144,31 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
         return;
       }
 
-      // Funnel the parsed data through the same zod schema /entries uses,
-      // so:
-      //   1. unknown categories (if the user messed with labels) are
-      //      dropped server-side,
-      //   2. monthly arrays are bound-checked (we already rounded in
-      //      the service but this is defense-in-depth),
-      //   3. the type narrows from {category: string} to CategoryKey.
-      const rawPayload = {
-        entries: Object.entries(sheet)
-          .filter(([, monthly]) => Array.isArray(monthly) && monthly.length === 12)
-          .map(([category, monthly]) => ({
-            category,
-            monthly: monthly as number[],
-          })),
-      };
-      const reparsed = UpsertEntriesSchema.safeParse(rawPayload);
-      if (!reparsed.success) {
-        reply.code(400).send({
-          error: 'Bad Request',
-          message: reparsed.error.issues[0]?.message ?? 'Conteúdo inválido na planilha',
-        });
-        return;
+      // Map labels to this period's category ids.
+      const categories = await prisma.periodCategory.findMany({
+        where: { periodId: period.id },
+        select: { id: true, label: true },
+      });
+      const labelToId = new Map<string, string>();
+      categories.forEach((c) => labelToId.set(c.label.trim().toLowerCase(), c.id));
+
+      const updates: Array<{ categoryId: string; monthly: number[] }> = [];
+      let unmatched = 0;
+      for (const [label, monthly] of Object.entries(sheetByLabel)) {
+        const id = labelToId.get(label.trim().toLowerCase());
+        if (id) updates.push({ categoryId: id, monthly });
+        else unmatched++;
       }
 
       try {
-        const result = await upsertEntries(
-          request.user!.id,
-          request.params.id,
-          reparsed.data,
-        );
+        const result = await bulkUpdateMonthly(request.user!.id, request.params.id, updates);
         if (!result) {
           reply.code(404).send({ error: 'Not Found' });
           return;
         }
 
-        // Optional: if the sheet has Metas, upsert them too.
         let metasUpdated = false;
         if (parsed.metas && Object.keys(parsed.metas).length > 0) {
-          // Clean up shape (Metas schema expects the optional keys directly).
           const metaInput: Record<string, number | null> = {};
           for (const [k, v] of Object.entries(parsed.metas)) {
             if (v === undefined) continue;
@@ -235,14 +189,16 @@ export async function xlsxRoutes(app: FastifyInstance): Promise<void> {
           metadata: {
             filename: sanitizeFilename(uploaded.filename),
             size: uploaded.buffer.length,
-            categoriesImported: result.touched.length,
+            categoriesImported: result.updated,
+            unmatchedRows: unmatched,
             metasUpdated,
           },
         });
 
         reply.send({
           ok: true,
-          categoriesImported: result.touched.length,
+          categoriesImported: result.updated,
+          unmatchedRows: unmatched,
           metasUpdated,
         });
       } catch (err) {

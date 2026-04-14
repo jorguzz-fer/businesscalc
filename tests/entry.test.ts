@@ -1,12 +1,9 @@
 /**
- * Entry CRUD + derived-value integration tests.
+ * Entries view + computed integration tests (post Fase 1.5 refactor).
  *
- * Coverage focus:
- *   - IDOR: can't read/write entries on someone else's period.
- *   - Freeze: FINALIZED period rejects writes (409).
- *   - Computed values are SERVER-authoritative (client lies ignored).
- *   - Monthly array shape enforced.
- *   - Only whitelisted categories accepted.
+ * The old bulk PUT entries shape is gone. The endpoint now returns
+ * { categories: [...], computed }. Writes happen via /api/categories/:id/monthly
+ * (covered in tests/category.test.ts).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -21,7 +18,7 @@ let http: SuperTest<Test>;
 async function truncate(): Promise<void> {
   await prisma.auditLog.deleteMany();
   await prisma.session.deleteMany();
-  await prisma.entry.deleteMany();
+  await prisma.periodCategory.deleteMany();
   await prisma.meta.deleteMany();
   await prisma.period.deleteMany();
   await prisma.user.deleteMany();
@@ -39,11 +36,11 @@ async function login(email: string): Promise<{ sid: string; csrf: string; userId
     where: { id: user.id },
     data: { emailVerified: true, verifyToken: null, verifyTokenExpires: null },
   });
-  const loginRes = await http.post('/api/auth/login').send({
+  const r = await http.post('/api/auth/login').send({
     email,
     password: 'verysecurepassword12345',
   });
-  const setCookie = loginRes.headers['set-cookie'] as string[] | undefined;
+  const setCookie = r.headers['set-cookie'] as string[] | undefined;
   const cookies: Record<string, string> = {};
   (setCookie ?? []).forEach((c) => {
     const first = c.split(';')[0];
@@ -66,7 +63,17 @@ async function createPeriod(
   return res.body.id as string;
 }
 
-const twelveZeros = Array.from({ length: 12 }, () => 0);
+async function patchMonthly(
+  auth: { sid: string; csrf: string },
+  categoryId: string,
+  monthly: number[],
+) {
+  return http
+    .patch(`/api/categories/${categoryId}/monthly`)
+    .set('Cookie', [`sid=${auth.sid}`])
+    .set('X-CSRF-Token', auth.csrf)
+    .send({ monthly });
+}
 
 beforeAll(async () => {
   app = await buildServer();
@@ -84,25 +91,30 @@ beforeEach(async () => {
   await truncate();
 });
 
-// ==========================================================
-// GET ENTRIES
-// ==========================================================
-
 describe('GET /api/periods/:id/entries', () => {
-  it('returns empty entries + zero computed for fresh DRE period', async () => {
-    const auth = await login('get1@test.com');
+  it('seeds DRE periods with 18 default categories', async () => {
+    const auth = await login('e1@test.com');
     const periodId = await createPeriod(auth, { name: 'DRE 2024', year: 2024, type: 'DRE' });
     const res = await http
       .get(`/api/periods/${periodId}/entries`)
       .set('Cookie', [`sid=${auth.sid}`]);
     expect(res.status).toBe(200);
     expect(res.body.periodType).toBe('DRE');
-    expect(res.body.entries).toEqual({});
+    expect(res.body.categories.length).toBe(18);
     expect(res.body.computed.totalReceita).toBe(0);
-    expect(res.body.computed.totalResultado).toBe(0);
   });
 
-  it('returns 404 for IDOR attempt (different user)', async () => {
+  it('seeds FC periods with 19 default categories (3 entrada + 16 saida)', async () => {
+    const auth = await login('e2@test.com');
+    const periodId = await createPeriod(auth, { name: 'FC 2024', year: 2024, type: 'FC' });
+    const res = await http
+      .get(`/api/periods/${periodId}/entries`)
+      .set('Cookie', [`sid=${auth.sid}`]);
+    expect(res.body.periodType).toBe('FC');
+    expect(res.body.categories.length).toBe(19);
+  });
+
+  it('IDOR: returns 404 for another user period', async () => {
     const alice = await login('a1@test.com');
     const bob = await login('b1@test.com');
     const periodId = await createPeriod(alice, { name: 'X', year: 2024, type: 'DRE' });
@@ -112,260 +124,80 @@ describe('GET /api/periods/:id/entries', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 404 for non-existent periodId', async () => {
-    const auth = await login('nf@test.com');
-    const res = await http
-      .get(`/api/periods/00000000-0000-0000-0000-000000000000/entries`)
-      .set('Cookie', [`sid=${auth.sid}`]);
-    expect(res.status).toBe(404);
-  });
-
-  it('returns 401 without session', async () => {
+  it('401 without session', async () => {
     const res = await http.get(`/api/periods/00000000-0000-0000-0000-000000000000/entries`);
     expect(res.status).toBe(401);
   });
 });
 
-// ==========================================================
-// PUT ENTRIES
-// ==========================================================
-
-describe('PUT /api/periods/:id/entries', () => {
-  it('upserts entries and recomputes server-side', async () => {
-    const auth = await login('put1@test.com');
-    const periodId = await createPeriod(auth, { name: 'DRE 2024', year: 2024, type: 'DRE' });
-    const payload = {
-      entries: [
-        { category: 'receita', monthly: [10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000] },
-        { category: 'cmv', monthly: [3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000] },
-        { category: 'pessoal', monthly: [4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000] },
-      ],
-    };
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send(payload);
-    expect(res.status).toBe(200);
-    expect(res.body.computed.totalReceita).toBe(120000); // 10000 * 12
-    // Lucro bruto = receita - cmv = 7000/mes * 12 = 84000
-    expect(res.body.computed.totalLucroBruto).toBe(84000);
-    // Resultado = lucroBruto - despOp (only pessoal here) = (7000 - 4000) * 12 = 36000
-    expect(res.body.computed.totalResultado).toBe(36000);
-    // Margem liquida = 36000 / 120000 = 30%
-    expect(res.body.computed.margemLiquidaAnual).toBeCloseTo(30);
-  });
-
-  it('ignores client-sent "computed" fields (server is authoritative)', async () => {
-    const auth = await login('auth1@test.com');
+describe('Server-computed values (DRE)', () => {
+  it('lucroBruto = (receita - dedução) - sum(custos diretos); resultado = lucroBruto - sum(despOp)', async () => {
+    const auth = await login('comp1@test.com');
     const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [
-          { category: 'receita', monthly: twelveZeros.slice() },
-        ],
-        computed: { totalReceita: 999999 }, // attempt to inject
-      });
-    // strict() rejects unknown top-level keys.
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects unknown category', async () => {
-    const auth = await login('cat1@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [{ category: 'malicious', monthly: twelveZeros.slice() }],
-      });
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects monthly array with wrong length', async () => {
-    const auth = await login('len1@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [{ category: 'receita', monthly: [1, 2, 3] }],
-      });
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects non-finite numbers (Infinity/NaN get sent as string via JSON)', async () => {
-    const auth = await login('fin1@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    // JSON.stringify turns Infinity into null — zod catches the null.
-    const bad = twelveZeros.slice();
-    bad[3] = null as unknown as number;
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [{ category: 'receita', monthly: bad }],
-      });
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects values above the MAX bound', async () => {
-    const auth = await login('max1@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    const over = [1e13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({ entries: [{ category: 'receita', monthly: over }] });
-    expect(res.status).toBe(400);
-  });
-
-  it('deletes categories omitted from next upsert (full replacement semantics)', async () => {
-    const auth = await login('repl@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    // First: two categories.
-    await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [
-          { category: 'receita', monthly: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100] },
-          { category: 'cmv', monthly: [50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50] },
-        ],
-      });
-    // Second: only receita — cmv must be dropped.
-    await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [
-          { category: 'receita', monthly: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100] },
-        ],
-      });
-    const get = await http
+    const view = await http
       .get(`/api/periods/${periodId}/entries`)
       .set('Cookie', [`sid=${auth.sid}`]);
-    expect(get.body.entries.receita).toBeDefined();
-    expect(get.body.entries.cmv).toBeUndefined();
+    type Cat = { id: string; section: string; label: string };
+    const cats = view.body.categories as Cat[];
+    const byLabel = (l: string) => cats.find((c) => c.label === l)!;
+
+    const twelve = (n: number) => Array.from({ length: 12 }, () => n);
+    await patchMonthly(auth, byLabel('Receita de Vendas').id, twelve(10000));
+    await patchMonthly(auth, byLabel('Deduções e Impostos').id, twelve(0));
+    await patchMonthly(auth, byLabel('CMV / Logística').id, twelve(3000));
+    await patchMonthly(auth, byLabel('Pessoal (Salários CLT)').id, twelve(4000));
+
+    const after = await http
+      .get(`/api/periods/${periodId}/entries`)
+      .set('Cookie', [`sid=${auth.sid}`]);
+    expect(after.body.computed.totalReceita).toBe(120000);
+    expect(after.body.computed.totalLucroBruto).toBe(84000); // (10000 - 3000) * 12
+    expect(after.body.computed.totalResultado).toBe(36000); // 7000 - 4000 = 3000/mes
+    expect(after.body.computed.margemLiquidaAnual).toBeCloseTo(30);
   });
 
-  it('rejects PUT on FINALIZED period (409)', async () => {
-    const auth = await login('fin2@test.com');
+  it('CUSTOM category added to CUSTOS_DIRETOS counts toward Lucro Bruto', async () => {
+    const auth = await login('comp2@test.com');
     const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    // Freeze it.
-    await http
-      .put(`/api/periods/${periodId}`)
+    const view = await http.get(`/api/periods/${periodId}/entries`).set('Cookie', [`sid=${auth.sid}`]);
+    const receitaId = view.body.categories.find((c: { label: string }) => c.label === 'Receita de Vendas').id;
+    const twelve = (n: number) => Array.from({ length: 12 }, () => n);
+    await patchMonthly(auth, receitaId, twelve(10000));
+
+    // Add a CUSTOM category in CUSTOS_DIRETOS.
+    const create = await http
+      .post(`/api/periods/${periodId}/categories`)
       .set('Cookie', [`sid=${auth.sid}`])
       .set('X-CSRF-Token', auth.csrf)
-      .send({ status: 'FINALIZED' });
-    // Try to edit entries.
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [{ category: 'receita', monthly: twelveZeros.slice() }],
-      });
-    expect(res.status).toBe(409);
-  });
+      .send({ section: 'CUSTOS_DIRETOS', label: 'Royalties Franquia' });
+    expect(create.status).toBe(201);
+    await patchMonthly(auth, create.body.id, twelve(500));
 
-  it('IDOR: PUT on another user period -> 404 and no mutation', async () => {
-    const alice = await login('idor1@test.com');
-    const bob = await login('idor2@test.com');
-    const periodId = await createPeriod(alice, { name: 'Mine', year: 2024, type: 'DRE' });
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${bob.sid}`])
-      .set('X-CSRF-Token', bob.csrf)
-      .send({
-        entries: [{ category: 'receita', monthly: [99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99] }],
-      });
-    expect(res.status).toBe(404);
-    // Alice's period has no entries.
-    const count = await prisma.entry.count({ where: { periodId } });
-    expect(count).toBe(0);
-  });
-
-  it('rejects without CSRF token', async () => {
-    const auth = await login('csrf1@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    const res = await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .send({
-        entries: [{ category: 'receita', monthly: twelveZeros.slice() }],
-      });
-    expect(res.status).toBe(403);
+    const after = await http
+      .get(`/api/periods/${periodId}/entries`)
+      .set('Cookie', [`sid=${auth.sid}`]);
+    // receita 120000 - custos 500*12=6000 = lucroBruto 114000
+    expect(after.body.computed.totalLucroBruto).toBe(114000);
   });
 });
-
-// ==========================================================
-// FC COMPUTED
-// ==========================================================
 
 describe('FC computation', () => {
-  it('computes totalSaidas + saldo server-side', async () => {
+  it('saldo = entradas (receita-only, money-kind, excluding ticket) - saídas', async () => {
     const auth = await login('fc1@test.com');
     const periodId = await createPeriod(auth, { name: 'FC 2024', year: 2024, type: 'FC' });
-    await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [
-          { category: 'receita', monthly: [10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000] },
-          { category: 'cmv', monthly: [2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000] },
-          { category: 'pessoal', monthly: [3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000] },
-          { category: 'pedidos', monthly: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100] },
-        ],
-      });
-    const res = await http
+    const view = await http.get(`/api/periods/${periodId}/entries`).set('Cookie', [`sid=${auth.sid}`]);
+    const byLabel = (l: string) =>
+      view.body.categories.find((c: { label: string }) => c.label === l).id;
+    const twelve = (n: number) => Array.from({ length: 12 }, () => n);
+    await patchMonthly(auth, byLabel('Receita de Vendas'), twelve(10000));
+    await patchMonthly(auth, byLabel('CMV / Logística'), twelve(2000));
+    await patchMonthly(auth, byLabel('Pessoal (Salários CLT)'), twelve(3000));
+
+    const after = await http
       .get(`/api/periods/${periodId}/entries`)
       .set('Cookie', [`sid=${auth.sid}`]);
-    expect(res.status).toBe(200);
-    expect(res.body.periodType).toBe('FC');
-    expect(res.body.computed.totalEntradasAno).toBe(120000);
-    expect(res.body.computed.totalSaidasAno).toBe(60000); // 2000+3000 * 12
-    expect(res.body.computed.saldoAno).toBe(60000);
-    expect(res.body.computed.pedidosAno).toBe(1200);
-    expect(res.body.computed.ticketMedioAno).toBeCloseTo(100); // 120000 / 1200
-  });
-});
-
-// ==========================================================
-// AUDIT
-// ==========================================================
-
-describe('Audit', () => {
-  it('records period.entries.update with categoriesTouched (no monetary values)', async () => {
-    const auth = await login('audit-e@test.com');
-    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
-    await http
-      .put(`/api/periods/${periodId}/entries`)
-      .set('Cookie', [`sid=${auth.sid}`])
-      .set('X-CSRF-Token', auth.csrf)
-      .send({
-        entries: [
-          { category: 'receita', monthly: [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-        ],
-      });
-    await audit.drain();
-    const events = await prisma.auditLog.findMany({
-      where: { action: 'period.entries.update', userId: auth.userId },
-    });
-    expect(events.length).toBe(1);
-    const metadata = events[0]!.metadata as { categoriesTouched: string[]; count: number };
-    expect(metadata.categoriesTouched).toContain('receita');
-    // Confirm no money leaked into the audit row.
-    expect(JSON.stringify(metadata)).not.toContain('100');
+    expect(after.body.computed.totalEntradasAno).toBe(120000);
+    expect(after.body.computed.totalSaidasAno).toBe(60000);
+    expect(after.body.computed.saldoAno).toBe(60000);
   });
 });

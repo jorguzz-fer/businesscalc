@@ -15,7 +15,6 @@
  * them, we silently skip unrecognized rows rather than erroring out.
  */
 import * as XLSX from 'xlsx';
-import type { CategoryKey } from '../schemas/entry.schema.js';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -46,48 +45,33 @@ export function validateBuffer(buf: Buffer): void {
 }
 
 /**
- * Labels exactly as they appear in the generated template. These ARE the
- * Portuguese display strings (not the internal category keys) — we map
- * each one to a CategoryKey during parse.
- *
- * Keeping this as a separate mapping (vs. reusing DRE_LABELS from
- * public/app.html) means we can evolve display strings without breaking
- * the parser.
+ * Labels we recognize in uploaded xlsx files. Both ASCII and accented
+ * variants are present so users can paste from anywhere. The route layer
+ * resolves these labels to PeriodCategory.id by matching against the
+ * period's current label list.
  */
-const LABEL_TO_KEY: Record<string, CategoryKey> = {
-  'Receita de Vendas': 'receita',
-  'Deducoes e Impostos': 'deducoes',
-  'Deduções e Impostos': 'deducoes', // tolerate accented variant
-  'CMV / Logistica': 'cmv',
-  'CMV / Logística': 'cmv',
-  'Outros Custos Diretos': 'outrosCustos',
-  Equipamentos: 'equipamentos',
-  'Provisao Manutencao': 'provisao',
-  'Provisão Manutenção': 'provisao',
-  'Pessoal (Salarios CLT)': 'pessoal',
-  'Pessoal (Salários CLT)': 'pessoal',
-  Beneficios: 'beneficios',
-  Benefícios: 'beneficios',
-  'INSS / FGTS': 'inss',
-  'Pro-Labore': 'proLabore',
-  'Pró-Labore': 'proLabore',
-  'Ferias / 13': 'ferias',
-  'Férias / 13°': 'ferias',
-  'Férias / 13': 'ferias',
-  Aluguel: 'aluguel',
-  Marketing: 'marketing',
-  'TI / Tecnologia': 'ti',
-  'Despesas Diversas': 'diversas',
-  'Manutencao Predial': 'manutPredial',
-  'Manutenção Predial': 'manutPredial',
-  'Exames / Saude': 'exames',
-  'Exames / Saúde': 'exames',
-  'Despesas Financeiras': 'despFin',
-  'Numero de Pedidos': 'pedidos',
-  'Número de Pedidos': 'pedidos',
-  'Ticket Medio': 'ticketMedio',
-  'Ticket Médio': 'ticketMedio',
-};
+const KNOWN_LABELS = new Set<string>([
+  'Receita de Vendas',
+  'Deducoes e Impostos', 'Deduções e Impostos',
+  'CMV / Logistica', 'CMV / Logística',
+  'Outros Custos Diretos',
+  'Equipamentos',
+  'Provisao Manutencao', 'Provisão Manutenção',
+  'Pessoal (Salarios CLT)', 'Pessoal (Salários CLT)',
+  'Beneficios', 'Benefícios',
+  'INSS / FGTS',
+  'Pro-Labore', 'Pró-Labore',
+  'Ferias / 13', 'Férias / 13°', 'Férias / 13',
+  'Aluguel',
+  'Marketing',
+  'TI / Tecnologia',
+  'Despesas Diversas',
+  'Manutencao Predial', 'Manutenção Predial',
+  'Exames / Saude', 'Exames / Saúde',
+  'Despesas Financeiras',
+  'Numero de Pedidos', 'Número de Pedidos', 'Nº de Pedidos',
+  'Ticket Medio', 'Ticket Médio',
+]);
 
 const METAS_LABEL_TO_KEY: Record<string, keyof MetasFromXlsx> = {
   'Receita Anual': 'receitaAnual',
@@ -103,7 +87,11 @@ const METAS_LABEL_TO_KEY: Record<string, keyof MetasFromXlsx> = {
   'Pedidos/Mês': 'pedidosMes',
 };
 
-export type EntriesFromXlsx = Partial<Record<CategoryKey, number[]>>;
+/**
+ * Map of label string -> 12 monthly numbers. Routes resolve labels to
+ * the period's PeriodCategory.id at upload time.
+ */
+export type EntriesByLabel = Record<string, number[]>;
 export type MetasFromXlsx = {
   receitaAnual?: number | null;
   lucroAnual?: number | null;
@@ -128,26 +116,43 @@ function numOrNull(v: unknown): number {
  *   row 0..n: headers/title lines (ignored)
  *   some row: category label in column A, 12 values in B..M
  *   ...
- * Returns whatever categories it found; unrecognized rows are skipped.
+ * Returns whatever rows we can read. Routes filter against the period's
+ * actual category labels — if user renamed a category, the upload simply
+ * skips the old-named row instead of clobbering.
+ *
+ * We optionally accept ANY non-empty label (not just KNOWN_LABELS) so a
+ * user who renames "Pessoal" to "Equipe" can still upload and have the
+ * row matched against their new label. Section-style header rows (no
+ * numeric values) are filtered by checking that at least one cell B..M
+ * is numeric.
  */
-function parseEntriesSheet(ws: XLSX.WorkSheet): EntriesFromXlsx {
+function parseEntriesSheet(ws: XLSX.WorkSheet): EntriesByLabel {
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, {
     header: 1,
     defval: 0,
     raw: true,
   });
-  const out: EntriesFromXlsx = {};
+  const out: EntriesByLabel = {};
   for (const row of aoa) {
     if (!Array.isArray(row) || row.length === 0) continue;
     const label = typeof row[0] === 'string' ? row[0].trim() : '';
     if (!label) continue;
-    const key = LABEL_TO_KEY[label];
-    if (!key) continue;
+    // Skip section header rows (no numeric values in B..M) AND the
+    // table header row ("Categoria | Jan | Fev | ..."). A row qualifies
+    // as a real entries row if at least one of B..M parses to a finite
+    // number — string values like month names ("Jan") don't count.
+    let hasNumeric = false;
     const monthly: number[] = [];
     for (let i = 1; i <= 12; i++) {
-      monthly.push(numOrNull(row[i]));
+      const cell = row[i];
+      monthly.push(numOrNull(cell));
+      if (typeof cell === 'number' && Number.isFinite(cell)) hasNumeric = true;
     }
-    out[key] = monthly;
+    // Always include if it's a known label (lets us preserve all-zero
+    // built-in rows). Otherwise require at least one numeric value.
+    if (KNOWN_LABELS.has(label) || hasNumeric) {
+      out[label] = monthly;
+    }
   }
   return out;
 }
@@ -175,8 +180,8 @@ function parseMetasSheet(ws: XLSX.WorkSheet): MetasFromXlsx {
 }
 
 export type ParsedWorkbook = {
-  dre?: EntriesFromXlsx;
-  fc?: EntriesFromXlsx;
+  dreByLabel?: EntriesByLabel;
+  fcByLabel?: EntriesByLabel;
   metas?: MetasFromXlsx;
 };
 
@@ -197,8 +202,8 @@ export function parseBuffer(buf: Buffer): ParsedWorkbook {
   });
 
   const out: ParsedWorkbook = {};
-  if (wb.Sheets['DRE']) out.dre = parseEntriesSheet(wb.Sheets['DRE']);
-  if (wb.Sheets['FC']) out.fc = parseEntriesSheet(wb.Sheets['FC']);
+  if (wb.Sheets['DRE']) out.dreByLabel = parseEntriesSheet(wb.Sheets['DRE']);
+  if (wb.Sheets['FC']) out.fcByLabel = parseEntriesSheet(wb.Sheets['FC']);
   if (wb.Sheets['Metas']) out.metas = parseMetasSheet(wb.Sheets['Metas']);
 
   return out;

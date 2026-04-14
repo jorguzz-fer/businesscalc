@@ -23,7 +23,7 @@ let http: SuperTest<Test>;
 async function truncate(): Promise<void> {
   await prisma.auditLog.deleteMany();
   await prisma.session.deleteMany();
-  await prisma.entry.deleteMany();
+  await prisma.periodCategory.deleteMany();
   await prisma.meta.deleteMany();
   await prisma.period.deleteMany();
   await prisma.user.deleteMany();

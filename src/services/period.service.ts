@@ -13,6 +13,7 @@
 import type { PeriodType, PeriodStatus, Period } from '@prisma/client';
 import { prisma } from '../db.js';
 import type { CreatePeriodInput, UpdatePeriodInput } from '../schemas/period.schema.js';
+import { seedDefaults } from './periodCategory.service.js';
 
 export async function list(
   userId: string,
@@ -42,13 +43,21 @@ export async function create(
   // Prisma throws P2002 on unique constraint violation. The (userId, name,
   // type) composite unique prevents "DRE 2024" twice for the same user.
   // The route layer catches this and maps it to 409.
-  return prisma.period.create({
-    data: {
-      userId,
-      name: input.name,
-      year: input.year,
-      type: input.type,
-    },
+  //
+  // We also seed the default categories (18 for DRE, 19 for FC) inside
+  // the same transaction so a period never exists with no categories —
+  // the UI can rely on `categories.length > 0`.
+  return prisma.$transaction(async (tx) => {
+    const period = await tx.period.create({
+      data: {
+        userId,
+        name: input.name,
+        year: input.year,
+        type: input.type,
+      },
+    });
+    await seedDefaults(tx, period.id, period.type);
+    return period;
   });
 }
 
