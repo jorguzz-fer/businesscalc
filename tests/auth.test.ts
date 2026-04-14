@@ -27,7 +27,7 @@ async function truncate(): Promise<void> {
   // Order matters for FK constraints — children first.
   await prisma.auditLog.deleteMany();
   await prisma.session.deleteMany();
-  await prisma.entry.deleteMany();
+  await prisma.periodCategory.deleteMany();
   await prisma.meta.deleteMany();
   await prisma.period.deleteMany();
   await prisma.user.deleteMany();

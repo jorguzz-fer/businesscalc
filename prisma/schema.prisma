@@ -102,29 +102,57 @@ model Period {
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
-  entries Entry[]
-  meta    Meta?
+  categories PeriodCategory[]
+  meta       Meta?
 
   @@unique([userId, name, type])
   @@index([userId])
   @@map("periods")
 }
 
-// ---------- Entries ----------
-// One row per category per period. `monthly` stores the 12 monthly values as
-// a JSON array of numbers. Storing as JSON (not 12 columns or 12 rows) keeps
-// the query simple and round-trips cleanly to the UI which already expects
-// an array of 12.
-model Entry {
-  id        String   @id @default(uuid())
-  periodId  String   @map("period_id")
-  period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  category  String   @db.VarChar(64)
-  monthly   Json
-  updatedAt DateTime @updatedAt @map("updated_at")
+// ---------- PeriodCategory ----------
+// One row per "line item" inside a period. Each category sits in a section
+// (RECEITA, CUSTOS_DIRETOS, etc) which determines its mathematical role
+// in computeDRE/computeFC, but the LABEL is free text and the user can
+// rename, add, or delete categories per period.
+//
+// monthly stores the 12 monthly values as a JSON array of numbers. Null
+// (or all-zeros) means "no value entered yet".
+//
+// isSystem distinguishes the seed categories created when a period is
+// created from user-added custom items. The user can rename/delete EITHER
+// (per the user's request — max flexibility).
+//
+// sortOrder controls display order within a section. New custom items get
+// max(sortOrder)+10 so they land at the bottom of their section.
+enum CategorySection {
+  RECEITA
+  DEDUCOES
+  CUSTOS_DIRETOS
+  DESPESAS_OP
+  ENTRADAS_FC
+  SAIDAS_FC
 
-  @@unique([periodId, category])
-  @@map("entries")
+  @@map("category_section")
+}
+
+model PeriodCategory {
+  id         String          @id @default(uuid())
+  periodId   String          @map("period_id")
+  period     Period          @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  section    CategorySection
+  label      String          @db.VarChar(120)
+  // "money" or "count" (count is for FC.pedidos which is a number of orders, not BRL)
+  kind       String          @default("money") @db.VarChar(16)
+  sortOrder  Int             @map("sort_order")
+  isSystem   Boolean         @default(false) @map("is_system")
+  // 12-element number array. null => not yet entered.
+  monthly    Json?
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  @@index([periodId, section, sortOrder])
+  @@map("period_categories")
 }
 
 // ---------- Metas ----------

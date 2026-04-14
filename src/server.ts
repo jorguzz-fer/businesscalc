@@ -20,6 +20,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, isDevelopment, isTest } from './config.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { periodRoutes } from './routes/period.routes.js';
+import { entryRoutes } from './routes/entry.routes.js';
+import { metaRoutes } from './routes/meta.routes.js';
+import { xlsxRoutes } from './routes/xlsx.routes.js';
+import { categoryRoutes } from './routes/category.routes.js';
 
 // When bundled to dist/server.js, __dirname would be dist/. We resolve
 // the public/ folder relative to the project root (one level up from
@@ -75,7 +80,18 @@ export async function buildServer(): Promise<FastifyInstance> {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+        // 'unsafe-inline' on scriptSrc: pragmatic MVP compromise. All
+        // inline <script> blocks on our pages are first-party (no
+        // templated user content is ever injected into a script context),
+        // and we have defense-in-depth via:
+        //   - zod strict() on every request body (no mass assignment)
+        //   - textContent (not innerHTML) for all user-supplied data
+        //   - SameSite=Strict cookies + CSRF tokens
+        //   - httpOnly session cookie (not stealable via XSS either way)
+        // Phase 3 TODO: extract inline scripts to external files and
+        // adopt CSP nonces (or hashes) to restore script-src strictness.
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+        scriptSrcAttr: ["'unsafe-inline'"], // for onclick/onchange handlers in app.html
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         imgSrc: ["'self'", 'data:'],
@@ -145,6 +161,13 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ---- Auth routes ----
   await app.register(authRoutes);
+
+  // ---- Period / Entry / Meta routes ----
+  await app.register(periodRoutes);
+  await app.register(entryRoutes);
+  await app.register(metaRoutes);
+  await app.register(xlsxRoutes);
+  await app.register(categoryRoutes);
 
   // ---- Static serving (public/) ----
   // Serves login.html, signup.html, app.html, assets/, etc.

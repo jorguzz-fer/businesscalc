@@ -75,4 +75,45 @@
     };
     inputEl.addEventListener('input', check);
   };
+
+  // Two inline SVGs — eye and eye-slash. Self-contained so we don't depend
+  // on emoji rendering across OSes (some show 👁 as monochrome, others
+  // colored) and we don't pull an icon font.
+  const EYE_SVG =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF_SVG =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+  /**
+   * Wraps a password input with a show/hide eye toggle button. The wrapper
+   * is created in-place — call ONCE per input (idempotent).
+   * Security note: visibility toggle is purely client-side; no password
+   * is ever logged or sent anywhere by this helper.
+   */
+  window.bindPasswordToggle = function (inputEl) {
+    if (!inputEl || inputEl.dataset.toggleBound === '1') return;
+    inputEl.dataset.toggleBound = '1';
+
+    // Wrap the input in a relative-positioned container.
+    const wrap = document.createElement('div');
+    wrap.className = 'password-wrap';
+    inputEl.parentNode.insertBefore(wrap, inputEl);
+    wrap.appendChild(inputEl);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'password-toggle';
+    btn.setAttribute('aria-label', 'Mostrar senha');
+    btn.setAttribute('tabindex', '0');
+    btn.innerHTML = EYE_SVG;
+    btn.addEventListener('click', function () {
+      const showing = inputEl.type === 'text';
+      inputEl.type = showing ? 'password' : 'text';
+      btn.innerHTML = showing ? EYE_SVG : EYE_OFF_SVG;
+      btn.setAttribute('aria-label', showing ? 'Mostrar senha' : 'Esconder senha');
+      // Restore focus and caret to the input so the user can keep typing.
+      inputEl.focus();
+    });
+    wrap.appendChild(btn);
+  };
 })();

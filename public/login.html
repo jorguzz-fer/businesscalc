@@ -47,6 +47,7 @@
       const form = document.getElementById('form');
       const submit = document.getElementById('submit');
       const alert = document.getElementById('alert');
+      window.bindPasswordToggle(document.getElementById('password'));
 
       // If we arrived here after a successful email verification:
       const verified = window.getQueryParam('verified');
