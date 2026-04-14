@@ -23,6 +23,7 @@ import { authRoutes } from './routes/auth.routes.js';
 import { periodRoutes } from './routes/period.routes.js';
 import { entryRoutes } from './routes/entry.routes.js';
 import { metaRoutes } from './routes/meta.routes.js';
+import { xlsxRoutes } from './routes/xlsx.routes.js';
 
 // When bundled to dist/server.js, __dirname would be dist/. We resolve
 // the public/ folder relative to the project root (one level up from
@@ -164,6 +165,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(periodRoutes);
   await app.register(entryRoutes);
   await app.register(metaRoutes);
+  await app.register(xlsxRoutes);
 
   // ---- Static serving (public/) ----
   // Serves login.html, signup.html, app.html, assets/, etc.
