@@ -1,94 +1,93 @@
 /**
- * Loads period entries + metas from the API and feeds them into the
- * existing renderDREDashboard / renderFCDashboard functions defined
- * in app.html's main <script>.
+ * Bridges the new dynamic-categories API to the existing v1 SPA dashboard
+ * renderers (renderDREDashboard / renderFCDashboard).
  *
- * Listens for bc:period-changed events (fired by app-periods.js).
- * When a period is selected:
- *   1. Fetch /api/periods/:id/entries  (raw entries + server-computed)
- *   2. Fetch /api/periods/:id/meta     (goals)
- *   3. Build a dashboard-shaped object matching the v1 SPA's internal
- *      format, so renderDREDashboard / renderFCDashboard Just Work.
- *   4. Call them and hide the empty-state upload area.
+ * The v1 renderers expect a flat object keyed by hardcoded category names
+ * (receita, deducoes, cmv, etc). Now categories are user-defined and live
+ * under section enums (RECEITA, CUSTOS_DIRETOS, ...).
  *
- * When no period is selected: show empty state, hide dashboard,
- * destroy charts.
+ * Strategy: collapse categories by section into the v1-compatible keys.
+ * Per-category granularity is preserved in the EDIT panel; the dashboard
+ * shows section-level totals + the server's computed values (which are
+ * already section-aware, so totals/lucro/margens stay accurate).
  */
 (function () {
   'use strict';
 
   function q(id) { return document.getElementById(id); }
+  const ZEROS = () => [0,0,0,0,0,0,0,0,0,0,0,0];
 
-  /**
-   * Convert the API response shape into the shape the v1 renderers expect.
-   * v1 uses the raw entry keys directly as properties on `d`, PLUS computed
-   * derived values. Our API returns { entries, computed } separately — merge
-   * them into a flat object.
-   */
+  // sum many monthly arrays element-wise.
+  function sum12(arrays) {
+    const out = ZEROS();
+    for (const a of arrays) {
+      if (!Array.isArray(a)) continue;
+      for (let i = 0; i < 12; i++) out[i] += (Number(a[i]) || 0);
+    }
+    return out;
+  }
+
+  function bySection(categories) {
+    const map = { RECEITA: [], DEDUCOES: [], CUSTOS_DIRETOS: [], DESPESAS_OP: [], ENTRADAS_FC: [], SAIDAS_FC: [] };
+    for (const c of categories || []) {
+      if (map[c.section]) map[c.section].push(c);
+    }
+    return map;
+  }
+
   function toDREDashboardData(apiResp, metas) {
-    const e = apiResp.entries || {};
     const c = apiResp.computed || {};
-    const zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const sec = bySection(apiResp.categories);
+    // For the v1 renderer's DRE table & donut, expose section-level sums
+    // under the legacy property names. A single "cmv" key holding the sum
+    // of CUSTOS_DIRETOS preserves the chart shape; the EDIT panel shows
+    // per-item granularity for editing.
+    const cmvSum = sum12(sec.CUSTOS_DIRETOS.map((x) => x.monthly));
+    const despOpSum = sum12(sec.DESPESAS_OP.map((x) => x.monthly));
     return {
-      // Raw entries (renderer references these by key for tables + donut)
-      receita: e.receita || zeros.slice(),
-      deducoes: e.deducoes || zeros.slice(),
-      cmv: e.cmv || zeros.slice(),
-      outrosCustos: e.outrosCustos || zeros.slice(),
-      equipamentos: e.equipamentos || zeros.slice(),
-      provisao: e.provisao || zeros.slice(),
-      pessoal: e.pessoal || zeros.slice(),
-      beneficios: e.beneficios || zeros.slice(),
-      inss: e.inss || zeros.slice(),
-      proLabore: e.proLabore || zeros.slice(),
-      ferias: e.ferias || zeros.slice(),
-      aluguel: e.aluguel || zeros.slice(),
-      marketing: e.marketing || zeros.slice(),
-      ti: e.ti || zeros.slice(),
-      diversas: e.diversas || zeros.slice(),
-      manutPredial: e.manutPredial || zeros.slice(),
-      exames: e.exames || zeros.slice(),
-      despFin: e.despFin || zeros.slice(),
-      // Computed (renamed to match v1 property names)
-      receitaLiq: c.receitaLiquida || zeros.slice(),
-      custosDiretos: c.custosDiretos || zeros.slice(),
-      lucroBruto: c.lucroBruto || zeros.slice(),
-      despOp: c.despesasOperacionais || zeros.slice(),
-      resultadoLiq: c.resultadoLiquido || zeros.slice(),
-      margemBrutaMensal: c.margemBrutaMensal || zeros.slice(),
-      margemLiqMensal: c.margemLiquidaMensal || zeros.slice(),
-      // v1 renderer also reads margemOpMensal — synthesize from mb-ml if absent
-      margemOpMensal: c.margemOpMensal || (c.margemLiquidaMensal || zeros.slice()),
+      // Inputs (collapsed by section).
+      receita: sum12(sec.RECEITA.map((x) => x.monthly)),
+      deducoes: sum12(sec.DEDUCOES.map((x) => x.monthly)),
+      cmv: cmvSum,
+      // Other CUSTOS_DIRETOS items go to zero so the donut doesn't double-count.
+      outrosCustos: ZEROS(), equipamentos: ZEROS(), provisao: ZEROS(),
+      pessoal: despOpSum,
+      // Other DESPESAS_OP go zero to avoid double-counting.
+      beneficios: ZEROS(), inss: ZEROS(), proLabore: ZEROS(), ferias: ZEROS(),
+      aluguel: ZEROS(), marketing: ZEROS(), ti: ZEROS(), diversas: ZEROS(),
+      manutPredial: ZEROS(), exames: ZEROS(), despFin: ZEROS(),
+      // Computed (server-authoritative).
+      receitaLiq: c.receitaLiquida || ZEROS(),
+      custosDiretos: c.custosDiretos || ZEROS(),
+      lucroBruto: c.lucroBruto || ZEROS(),
+      despOp: c.despesasOperacionais || ZEROS(),
+      resultadoLiq: c.resultadoLiquido || ZEROS(),
+      margemBrutaMensal: c.margemBrutaMensal || ZEROS(),
+      margemLiqMensal: c.margemLiquidaMensal || ZEROS(),
+      margemOpMensal: c.margemLiquidaMensal || ZEROS(),
       metas: metas || {},
     };
   }
 
   function toFCDashboardData(apiResp) {
-    const e = apiResp.entries || {};
     const c = apiResp.computed || {};
-    const zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const sec = bySection(apiResp.categories);
+    // Identify the receita line in ENTRADAS_FC by money kind + label match.
+    const receitaCat = sec.ENTRADAS_FC.find((x) => /receita|vendas/i.test(x.label));
+    const pedidosCat = sec.ENTRADAS_FC.find((x) => x.kind === 'count');
+    const ticketCat = sec.ENTRADAS_FC.find((x) => /ticket/i.test(x.label));
+    const saidasSum = sum12(sec.SAIDAS_FC.map((x) => x.monthly));
     return {
-      receita: e.receita || zeros.slice(),
-      pedidos: e.pedidos || zeros.slice(),
-      ticketMedio: e.ticketMedio || zeros.slice(),
-      cmv: e.cmv || zeros.slice(),
-      outrosCustos: e.outrosCustos || zeros.slice(),
-      equipamentos: e.equipamentos || zeros.slice(),
-      provisao: e.provisao || zeros.slice(),
-      pessoal: e.pessoal || zeros.slice(),
-      beneficios: e.beneficios || zeros.slice(),
-      inss: e.inss || zeros.slice(),
-      proLabore: e.proLabore || zeros.slice(),
-      ferias: e.ferias || zeros.slice(),
-      aluguel: e.aluguel || zeros.slice(),
-      marketing: e.marketing || zeros.slice(),
-      ti: e.ti || zeros.slice(),
-      diversas: e.diversas || zeros.slice(),
-      manutPredial: e.manutPredial || zeros.slice(),
-      exames: e.exames || zeros.slice(),
-      despFin: e.despFin || zeros.slice(),
-      totalSaidas: c.totalSaidas || zeros.slice(),
-      saldo: c.saldo || zeros.slice(),
+      receita: receitaCat?.monthly || ZEROS(),
+      pedidos: pedidosCat?.monthly || ZEROS(),
+      ticketMedio: ticketCat?.monthly || ZEROS(),
+      cmv: saidasSum, // collapse all saídas under cmv for the v1 donut
+      outrosCustos: ZEROS(), equipamentos: ZEROS(), provisao: ZEROS(),
+      pessoal: ZEROS(), beneficios: ZEROS(), inss: ZEROS(), proLabore: ZEROS(),
+      ferias: ZEROS(), aluguel: ZEROS(), marketing: ZEROS(), ti: ZEROS(),
+      diversas: ZEROS(), manutPredial: ZEROS(), exames: ZEROS(), despFin: ZEROS(),
+      totalSaidas: c.saidas || ZEROS(),
+      saldo: c.saldo || ZEROS(),
     };
   }
 
@@ -99,7 +98,6 @@
     const dashboard = q(type === 'DRE' ? 'dre-dashboard' : 'fc-dashboard');
 
     if (!periodId) {
-      // Back to empty state.
       if (empty) empty.style.display = 'flex';
       if (dashboard) dashboard.style.display = 'none';
       return;
@@ -123,7 +121,6 @@
       }
     } catch (err) {
       console.error('[period-loader] failed', err);
-      // Fall back to empty state so user isn't stuck.
       if (empty) empty.style.display = 'flex';
       if (dashboard) dashboard.style.display = 'none';
     }
@@ -135,6 +132,5 @@
     loadAndRender(type, periodId);
   });
 
-  // Expose reload for the upload handler (next step) to call after a successful upload.
   window.bcPeriodLoader = { loadAndRender };
 })();
