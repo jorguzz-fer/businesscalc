@@ -1245,6 +1245,8 @@
 
     <!-- Tab: DRE -->
     <div id="tab-dre" class="tab-panel">
+        <!-- Period picker (server-backed) -->
+        <div id="dre-period-bar"></div>
         <!-- Empty state -->
         <div id="dre-empty" class="empty-state">
             <div class="empty-icon">📊</div>
@@ -1296,6 +1298,8 @@
 
     <!-- Tab: Fluxo de Caixa -->
     <div id="tab-fc" class="tab-panel">
+        <!-- Period picker (server-backed) -->
+        <div id="fc-period-bar"></div>
         <!-- Empty state -->
         <div id="fc-empty" class="empty-state">
             <div class="empty-icon">&#128178;</div>
@@ -2272,5 +2276,7 @@
         });
     })();
 </script>
+<!-- Fase 1: server-backed period picker for DRE + FC tabs -->
+<script src="/assets/app-periods.js"></script>
 </body>
 </html>
