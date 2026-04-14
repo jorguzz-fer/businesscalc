@@ -1,0 +1,172 @@
+/* BusinessCalc — auth pages shared styles. Mirrors the v1 SPA tokens. */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #f5f3f0;
+  --bg-card: #ffffff;
+  --bg-input: #f8f7f5;
+  --border: #e5e2dd;
+  --border-light: #eeebe7;
+  --text: #1a1a1a;
+  --text-secondary: #6b6560;
+  --text-muted: #9e9890;
+  --green: #16a34a;
+  --green-dark: #15803d;
+  --green-bg: #f0fdf4;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --red-border: #fecaca;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+}
+
+html { font-size: 15px; }
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2rem 2rem 1.75rem;
+}
+
+.auth-logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.3rem;
+}
+.auth-logo span { color: var(--green); }
+.auth-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.75rem;
+}
+
+.form { display: flex; flex-direction: column; gap: 1rem; }
+.field { display: flex; flex-direction: column; gap: 0.35rem; }
+.field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="password"] {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(22,163,74,0.1);
+}
+.field input:disabled { opacity: 0.6; cursor: not-allowed; }
+.field-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.checkbox-row input[type="checkbox"] {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+.checkbox-row a { color: var(--green); text-decoration: none; }
+.checkbox-row a:hover { text-decoration: underline; }
+
+.btn {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, transform 0.05s;
+  margin-top: 0.3rem;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary { background: var(--green); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--green-dark); }
+
+.alert {
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.alert-error { background: var(--red-bg); color: #7f1d1d; border: 1px solid var(--red-border); }
+.alert-success { background: var(--green-bg); color: #14532d; }
+.alert-info { background: var(--amber-bg); color: #78350f; }
+.hidden { display: none !important; }
+
+.auth-links {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.auth-links a { color: var(--green); text-decoration: none; font-weight: 600; }
+.auth-links a:hover { text-decoration: underline; }
+
+.status-icon {
+  font-size: 2.5rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+/* Password strength */
+.strength-meter {
+  height: 3px;
+  background: var(--border-light);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 0.3rem;
+}
+.strength-meter-fill {
+  height: 100%;
+  width: 0;
+  transition: width 0.2s, background 0.2s;
+}
+.strength-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}

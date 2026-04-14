@@ -14,9 +14,21 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
-import csrfProtection from '@fastify/csrf-protection';
 import formbody from '@fastify/formbody';
+import staticPlugin from '@fastify/static';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config, isDevelopment, isTest } from './config.js';
+import { authRoutes } from './routes/auth.routes.js';
+
+// When bundled to dist/server.js, __dirname would be dist/. We resolve
+// the public/ folder relative to the project root (one level up from
+// dist). In ESM we compute this from import.meta.url.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// src/server.ts at dev time OR dist/server.js at runtime — both one level
+// below the project root, so ../public works in both cases.
+const PUBLIC_DIR = path.resolve(__dirname, '../public');
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -100,45 +112,52 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // ---- Global rate limit (per-IP) ----
   // Per-route limits in auth.routes.ts will override with stricter thresholds.
-  await app.register(rateLimit, {
-    global: true,
-    max: 100,
-    timeWindow: '1 minute',
-    hook: 'onRequest',
-    // Log but don't ban: 429 response already does the throttling.
-    errorResponseBuilder: (_req, context) => ({
-      statusCode: 429,
-      error: 'Too Many Requests',
-      message: `Muitas requisições. Tente novamente em ${Math.ceil(
-        context.ttl / 1000,
-      )} segundos.`,
-    }),
-  });
+  // Disabled in test mode — supertest always hits the same IP so throttling
+  // fires almost immediately and poisons the suite. We cover the limit
+  // itself in a dedicated test that deliberately hammers the endpoint.
+  if (!isTest) {
+    await app.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: '1 minute',
+      hook: 'onRequest',
+      errorResponseBuilder: (_req, context) => ({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: `Muitas requisições. Tente novamente em ${Math.ceil(
+          context.ttl / 1000,
+        )} segundos.`,
+      }),
+    });
+  }
 
-  // ---- CSRF protection (double-submit cookie pattern) ----
-  // Activated here so the plugin registers; actual enforcement happens in the
-  // requireAuth middleware (Task 0.7) which validates the token for
-  // POST/PUT/PATCH/DELETE on authenticated routes.
-  await app.register(csrfProtection, {
-    sessionPlugin: '@fastify/cookie',
-    cookieOpts: {
-      httpOnly: false, // JS must read it to send as header (double-submit)
-      secure: !isDevelopment,
-      sameSite: 'strict',
-      path: '/',
-    },
-    getToken: (req) => {
-      const header = req.headers['x-csrf-token'];
-      return typeof header === 'string' ? header : undefined;
-    },
-  });
+  // CSRF enforcement: not a Fastify plugin. We implement the double-submit
+  // cookie pattern ourselves in middleware/requireAuth.ts — the server
+  // compares request.headers['x-csrf-token'] against the token stored in
+  // the session row in Postgres. See that file for the rationale.
 
-  // ---- Health check ----
+  // ---- Health check (unauthenticated; safe to expose) ----
   app.get('/api/health', async () => ({
     status: 'ok',
     env: config.NODE_ENV,
     timestamp: new Date().toISOString(),
   }));
+
+  // ---- Auth routes ----
+  await app.register(authRoutes);
+
+  // ---- Static serving (public/) ----
+  // Serves login.html, signup.html, app.html, assets/, etc.
+  // wildcard:false so /api/* doesn't get intercepted — our route handlers
+  // above take priority and this fallback serves everything else.
+  await app.register(staticPlugin, {
+    root: PUBLIC_DIR,
+    wildcard: false,
+    index: ['index.html'],
+    prefix: '/',
+    cacheControl: true,
+    maxAge: isDevelopment ? 0 : 3600,
+  });
 
   // ---- Generic error handler: never leak stack traces in production ----
   app.setErrorHandler((error, request, reply) => {

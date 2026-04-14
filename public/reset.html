@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redefinir senha — BusinessCalc</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body>
+  <div class="auth-card">
+    <h1 class="auth-logo">Business<span>Calc</span></h1>
+    <p class="auth-subtitle">Definir nova senha</p>
+
+    <div id="alert" class="alert hidden"></div>
+
+    <form id="form" class="form" novalidate>
+      <div class="field">
+        <label for="password">Nova senha</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" required minlength="12">
+        <div class="strength-meter"><div id="strength-fill" class="strength-meter-fill"></div></div>
+        <div id="strength-label" class="strength-label">Mínimo 12 caracteres</div>
+      </div>
+      <div class="field">
+        <label for="confirm">Confirmar senha</label>
+        <input type="password" id="confirm" name="confirm" autocomplete="new-password" required minlength="12">
+      </div>
+      <button type="submit" class="btn btn-primary" id="submit">Redefinir senha</button>
+    </form>
+
+    <div class="auth-links">
+      <a href="/login.html">Voltar ao login</a>
+    </div>
+  </div>
+
+  <script src="/assets/auth.js"></script>
+  <script>
+    const token = window.getQueryParam('token');
+    const form = document.getElementById('form');
+    const submit = document.getElementById('submit');
+    const alert = document.getElementById('alert');
+
+    if (!token) {
+      alert.className = 'alert alert-error';
+      alert.textContent = 'Link inválido. Solicite novamente em "Esqueci minha senha".';
+      alert.classList.remove('hidden');
+      form.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+    }
+
+    window.bindStrengthMeter(
+      document.getElementById('password'),
+      document.getElementById('strength-fill'),
+      document.getElementById('strength-label'),
+    );
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      alert.classList.add('hidden');
+      const pw = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm').value;
+      if (pw !== confirm) {
+        alert.className = 'alert alert-error';
+        alert.textContent = 'As senhas não coincidem.';
+        alert.classList.remove('hidden');
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = 'Salvando...';
+      try {
+        await window.api('POST', '/api/auth/reset-password', { token: token, newPassword: pw });
+        alert.className = 'alert alert-success';
+        alert.textContent = 'Senha redefinida! Redirecionando para o login...';
+        alert.classList.remove('hidden');
+        form.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+        setTimeout(function () { window.location.href = '/login.html'; }, 1500);
+      } catch (err) {
+        alert.className = 'alert alert-error';
+        alert.textContent = err.message || 'Erro ao redefinir senha';
+        alert.classList.remove('hidden');
+        submit.disabled = false;
+        submit.textContent = 'Redefinir senha';
+      }
+    });
+  </script>
+</body>
+</html>

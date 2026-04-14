@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — BusinessCalc</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/auth.css">
+</head>
+<body>
+  <div class="auth-card">
+    <h1 class="auth-logo">Business<span>Calc</span></h1>
+    <p class="auth-subtitle">Entre com sua conta</p>
+
+    <div id="alert" class="alert alert-error hidden"></div>
+
+    <form id="form" class="form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="password">Senha</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" id="submit">Entrar</button>
+    </form>
+
+    <div class="auth-links">
+      <a href="/signup.html">Criar conta</a>
+      <a href="/forgot.html">Esqueci minha senha</a>
+    </div>
+  </div>
+
+  <script src="/assets/auth.js"></script>
+  <script>
+    (async function () {
+      // If already logged in, skip straight to /app.html
+      try {
+        await window.api('GET', '/api/auth/me');
+        window.location.href = '/app.html';
+        return;
+      } catch (_e) { /* not logged in — stay on page */ }
+
+      const form = document.getElementById('form');
+      const submit = document.getElementById('submit');
+      const alert = document.getElementById('alert');
+
+      // If we arrived here after a successful email verification:
+      const verified = window.getQueryParam('verified');
+      if (verified === '1') {
+        alert.className = 'alert alert-success';
+        alert.textContent = 'Email verificado! Faça login para continuar.';
+        alert.classList.remove('hidden');
+      }
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        alert.classList.add('hidden');
+        submit.disabled = true;
+        submit.textContent = 'Entrando...';
+        try {
+          const data = {
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+          };
+          await window.api('POST', '/api/auth/login', data);
+          window.location.href = '/app.html';
+        } catch (err) {
+          alert.className = 'alert ' + (err.code === 'email_not_verified' ? 'alert-info' : 'alert-error');
+          alert.textContent = err.message || 'Erro ao entrar';
+          alert.classList.remove('hidden');
+          submit.disabled = false;
+          submit.textContent = 'Entrar';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
