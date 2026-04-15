@@ -173,9 +173,9 @@
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.textContent = 'Fechar';
-    closeBtn.style.cssText = 'padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);cursor:pointer;font-size:0.78rem;font-family:inherit;';
-    closeBtn.addEventListener('click', () => togglePanel(type));
+    closeBtn.textContent = '✓ Salvar';
+    closeBtn.style.cssText = 'padding:0.45rem 1.1rem;border:none;border-radius:var(--radius-sm);background:var(--green);color:#fff;cursor:pointer;font-size:0.82rem;font-weight:700;font-family:inherit;';
+    closeBtn.addEventListener('click', () => saveAndClose(type));
     right.appendChild(closeBtn);
     header.appendChild(right);
     panel.appendChild(header);
@@ -305,6 +305,25 @@
     table.appendChild(tbody);
     wrap.appendChild(table);
     panel.appendChild(wrap);
+
+    // Bottom Salvar bar — same behavior as the top button, positioned so
+    // the user doesn't have to scroll back up after filling a long section.
+    if (!state.finalizado) {
+      const footer = document.createElement('div');
+      footer.style.cssText = 'display:flex;justify-content:flex-end;padding-top:1.25rem;margin-top:1rem;border-top:1px solid var(--border-light);gap:0.75rem;align-items:center;';
+      const footerStatus = document.createElement('span');
+      footerStatus.id = type + '-edit-status-footer';
+      footerStatus.style.cssText = 'font-size:0.78rem;color:var(--text-muted);margin-right:auto;';
+      const bottomSave = document.createElement('button');
+      bottomSave.type = 'button';
+      bottomSave.textContent = '✓ Salvar';
+      bottomSave.style.cssText = 'padding:0.6rem 1.4rem;border:none;border-radius:var(--radius-sm);background:var(--green);color:#fff;cursor:pointer;font-size:0.88rem;font-weight:700;font-family:inherit;';
+      bottomSave.addEventListener('click', () => saveAndClose(type));
+      footer.appendChild(footerStatus);
+      footer.appendChild(bottomSave);
+      panel.appendChild(footer);
+    }
+
     updateStatus(type, state.finalizado ? 'Read-only' : 'Pronto');
   }
 
@@ -392,10 +411,41 @@
   }
 
   function updateStatus(type, text, isError) {
-    const el = document.getElementById(type + '-edit-status');
-    if (!el) return;
-    el.textContent = text;
-    el.style.color = isError ? 'var(--red)' : 'var(--text-muted)';
+    [type + '-edit-status', type + '-edit-status-footer'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = isError ? 'var(--red)' : 'var(--text-muted)';
+    });
+  }
+
+  /**
+   * Flush any pending debounced saves, then close the panel.
+   * Called by both the top-right and bottom Salvar buttons.
+   */
+  async function saveAndClose(type) {
+    const state = panelState[type];
+    const pendingIds = Object.keys(state.saveTimers);
+    // Cancel the debounce timers so they don't fire again after we
+    // trigger the save here.
+    pendingIds.forEach((id) => {
+      clearTimeout(state.saveTimers[id]);
+      delete state.saveTimers[id];
+    });
+    if (pendingIds.length > 0) {
+      updateStatus(type, 'Salvando...');
+      try {
+        await Promise.all(pendingIds.map((id) => doSave(type, id)));
+      } catch (_e) { /* doSave already updates status on error */ }
+    }
+    // Toggle closes and reopens dashboard via bcPeriodLoader.
+    state.open = false;
+    const panel = ensurePanelContainer(type);
+    if (panel) panel.style.display = 'none';
+    const active = window.bcPeriods?.getActive(type);
+    if (active && window.bcPeriodLoader) {
+      await window.bcPeriodLoader.loadAndRender(type, active.id);
+    }
   }
 
   // ---------- per-cell autosave ----------
