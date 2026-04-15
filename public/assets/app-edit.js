@@ -255,7 +255,7 @@
     MONTHS.forEach((m) => {
       const th = document.createElement('th');
       th.textContent = m;
-      th.style.cssText = 'padding:0.5rem 0.4rem;text-align:right;font-size:0.7rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border);font-family:"Space Mono",monospace;min-width:90px;';
+      th.style.cssText = 'padding:0.5rem 0.4rem;text-align:right;font-size:0.7rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border);font-family:"Space Mono",monospace;min-width:120px;';
       hrow.appendChild(th);
     });
     // Last column: actions (delete button)
@@ -344,7 +344,7 @@
         : (monthly[m] ? String(Math.round(monthly[m])) : '');
       input.placeholder = '0';
       input.disabled = state.finalizado;
-      input.style.cssText = 'width:100%;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:6px;font-family:"Space Mono",monospace;font-size:0.8rem;background:var(--bg-input);outline:none;text-align:right;';
+      input.style.cssText = 'width:100%;padding:0.35rem 0.4rem;border:1px solid var(--border);border-radius:6px;font-family:"Space Mono",monospace;font-size:0.78rem;background:var(--bg-input);outline:none;text-align:right;min-width:0;';
       if (cat.kind === 'money') bindMoneyMask(input);
       else input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, ''); });
       input.addEventListener('input', () => scheduleSave(type, cat.id));
