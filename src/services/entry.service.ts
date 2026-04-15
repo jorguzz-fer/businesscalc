@@ -21,6 +21,7 @@
  */
 import { Prisma, type CategorySection, type PeriodCategory } from '@prisma/client';
 import { prisma } from '../db.js';
+import { seedDefaults } from './periodCategory.service.js';
 
 export type MonthlyArray = [
   number, number, number, number, number, number,
@@ -82,9 +83,22 @@ export async function getByPeriod(
     },
   });
   if (!period) return null;
+  // Lazy seed: legacy periods that predate Fase 1.5 (or any period
+  // that lost all categories) get the defaults restored on first read.
+  // seedDefaults is idempotent inside.
+  let categories = period.categories;
+  if (categories.length === 0) {
+    await prisma.$transaction(async (tx) => {
+      await seedDefaults(tx, period.id, period.type);
+    });
+    categories = await prisma.periodCategory.findMany({
+      where: { periodId: period.id },
+      orderBy: [{ section: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
   return {
     periodType: period.type,
-    categories: period.categories.map((c: PeriodCategory) => ({
+    categories: categories.map((c: PeriodCategory) => ({
       id: c.id,
       section: c.section,
       label: c.label,

@@ -315,6 +315,47 @@ describe('DELETE /api/categories/:id', () => {
   });
 });
 
+describe('Lazy seed (legacy/empty periods)', () => {
+  it('GET on a period with zero categories auto-seeds defaults', async () => {
+    const auth = await login('seed1@test.com');
+    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
+    // Manually wipe categories to simulate a legacy/empty period.
+    await prisma.periodCategory.deleteMany({ where: { periodId } });
+    expect(await prisma.periodCategory.count({ where: { periodId } })).toBe(0);
+    const res = await http
+      .get(`/api/periods/${periodId}/categories`)
+      .set('Cookie', [`sid=${auth.sid}`]);
+    expect(res.status).toBe(200);
+    expect(res.body.categories.length).toBe(18);
+  });
+
+  it('GET /entries on an empty period also auto-seeds', async () => {
+    const auth = await login('seed2@test.com');
+    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'FC' });
+    await prisma.periodCategory.deleteMany({ where: { periodId } });
+    const res = await http
+      .get(`/api/periods/${periodId}/entries`)
+      .set('Cookie', [`sid=${auth.sid}`]);
+    expect(res.status).toBe(200);
+    expect(res.body.categories.length).toBe(19); // FC = 19 defaults
+  });
+
+  it('lazy seed does NOT touch a period that already has categories', async () => {
+    const auth = await login('seed3@test.com');
+    const periodId = await createPeriod(auth, { name: 'X', year: 2024, type: 'DRE' });
+    // Rename one to verify it survives subsequent GETs.
+    const list = await http.get(`/api/periods/${periodId}/categories`).set('Cookie', [`sid=${auth.sid}`]);
+    const first = list.body.categories[0];
+    await http
+      .patch(`/api/categories/${first.id}`)
+      .set('Cookie', [`sid=${auth.sid}`])
+      .set('X-CSRF-Token', auth.csrf)
+      .send({ label: 'CUSTOM NAME' });
+    const after = await http.get(`/api/periods/${periodId}/categories`).set('Cookie', [`sid=${auth.sid}`]);
+    expect(after.body.categories.find((c: { id: string }) => c.id === first.id).label).toBe('CUSTOM NAME');
+  });
+});
+
 describe('Audit', () => {
   it('records category.create with section + label', async () => {
     const auth = await login('aud@test.com');
