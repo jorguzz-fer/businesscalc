@@ -1,14 +1,14 @@
-/* BusinessCalc — auth pages shared styles. Mirrors the v1 SPA tokens. */
+/* BusinessCalc — auth pages. v2025-05 — fluid, airy, mobile-first. */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg: #f5f3f0;
+  --bg: #faf9f7;
   --bg-card: #ffffff;
   --bg-input: #f8f7f5;
-  --border: #e5e2dd;
-  --border-light: #eeebe7;
+  --border: #e8e4de;
+  --border-light: #f0ede8;
   --text: #1a1a1a;
-  --text-secondary: #6b6560;
+  --text-secondary: #5f5a55;
   --text-muted: #9e9890;
   --green: #16a34a;
   --green-dark: #15803d;
@@ -18,114 +18,122 @@
   --red-border: #fecaca;
   --amber: #d97706;
   --amber-bg: #fffbeb;
-  --radius: 16px;
+  --radius: 14px;
   --radius-sm: 10px;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.05);
 }
 
 html {
-  font-size: 15px;
-  /* Dynamic viewport height: mobile Safari/Chrome show the URL bar
-     sometimes, so `100vh` can overflow. `100dvh` respects the chrome. */
+  /* Dynamic viewport so iOS Safari's shrinking URL bar doesn't overflow. */
   min-height: 100dvh;
+  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-  /* Subtle gradient backdrop so the card floats rather than sitting in
-     a flat slab. Same green-tint feel as the product without shouting. */
-  background:
-    radial-gradient(circle at 20% 0%, rgba(22,163,74,0.06), transparent 60%),
-    radial-gradient(circle at 80% 100%, rgba(22,163,74,0.04), transparent 60%),
-    var(--bg);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+  background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(1rem, 4vw, 2rem);
   -webkit-font-smoothing: antialiased;
+  /* Mobile-first layout: content flows from top, centered horizontally.
+     Larger screens shift to vertically-centered (media query below). */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
   overflow-x: hidden;
 }
 
+/* ==========================================================
+   Mobile-first: no card chrome, content breathes full-width.
+   The "caixa" feeling came from a visible border + shadow on every
+   viewport — mobile now has NO border and NO card at all, just flow.
+   ========================================================== */
+
 .auth-card {
   width: 100%;
-  max-width: 440px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: clamp(1.5rem, 4vw, 2.25rem) clamp(1.5rem, 4vw, 2.25rem) clamp(1.25rem, 3vw, 2rem);
-  /* Subtle entrance so the page doesn't feel static. */
-  animation: card-fade-in 0.35s ease-out;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 1.75rem 1.25rem 2rem;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
-@keyframes card-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+/* Subtle entrance animation; disabled for reduced motion. */
+.auth-card { animation: auth-fade-in 0.35s ease-out; }
+@keyframes auth-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 .auth-logo {
-  font-size: clamp(1.35rem, 4.5vw, 1.6rem);
+  font-size: 1.4rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.25rem;
   line-height: 1.1;
+  color: var(--text);
 }
 .auth-logo span { color: var(--green); }
+
 .auth-subtitle {
-  font-size: clamp(0.82rem, 2.2vw, 0.9rem);
+  font-size: 0.95rem;
   color: var(--text-secondary);
-  margin-bottom: clamp(1.25rem, 4vw, 1.75rem);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
 }
 
-.form { display: flex; flex-direction: column; gap: 0.9rem; }
-.field { display: flex; flex-direction: column; gap: 0.35rem; }
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 .field label {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-secondary);
+  letter-spacing: 0.01em;
 }
+
 .field input[type="text"],
 .field input[type="email"],
 .field input[type="password"] {
   width: 100%;
-  background: var(--bg-input);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.75rem 0.85rem;
-  font-size: 0.95rem; /* >=16px on desktop, prevents iOS zoom-on-focus for 16px+ in reality ~14px css */
+  /* 16px minimum so iOS Safari does not zoom on focus. */
+  font-size: 16px;
   font-family: inherit;
   color: var(--text);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 0.95rem;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  /* Prevents iOS Safari zooming in on focus for small input font sizes. */
-  -webkit-text-size-adjust: 100%;
-}
-/* iOS Safari zooms if font-size is < 16px at focus time. Our 0.95rem at
-   15px root = 14.25px would trigger zoom. Bump to 16px on phones. */
-@media (max-width: 480px) {
-  .field input[type="text"],
-  .field input[type="email"],
-  .field input[type="password"] {
-    font-size: 16px;
-  }
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  min-height: 48px;
 }
 .field input:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(22,163,74,0.12);
-  background: #fff;
+  box-shadow: 0 0 0 3px rgba(22,163,74,0.15);
 }
-.field input:disabled { opacity: 0.6; cursor: not-allowed; }
+.field input:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* Password input with show/hide toggle */
+/* Password field with show/hide toggle button. */
 .password-wrap {
   position: relative;
 }
 .password-wrap input {
-  /* room for the toggle button on the right */
-  padding-right: 2.8rem;
+  padding-right: 3rem;
 }
 .password-toggle {
   position: absolute;
@@ -134,180 +142,192 @@ body {
   transform: translateY(-50%);
   background: none;
   border: none;
-  padding: 0.4rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  border-radius: 6px;
+  border-radius: 8px;
   transition: color 0.15s, background 0.15s;
-  /* Larger hit area on phones for thumb taps. */
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 40px;
+  min-height: 40px;
 }
 .password-toggle:hover { color: var(--text); background: var(--border-light); }
-.password-toggle:focus { outline: 2px solid var(--green); outline-offset: 1px; }
-.password-toggle svg { width: 18px; height: 18px; display: block; }
+.password-toggle:focus { outline: 2px solid var(--green); outline-offset: 2px; }
+.password-toggle svg { width: 20px; height: 20px; display: block; }
 
 .field-hint {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .checkbox-row {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.6rem;
   align-items: flex-start;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: var(--text-secondary);
-  line-height: 1.45;
+  line-height: 1.5;
+  padding: 0.25rem 0;
 }
 .checkbox-row input[type="checkbox"] {
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
   flex-shrink: 0;
-  /* Bigger tap target on phones. */
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 1.15rem;
+  height: 1.15rem;
   accent-color: var(--green);
+  cursor: pointer;
 }
-.checkbox-row a { color: var(--green); text-decoration: none; }
+.checkbox-row a { color: var(--green); text-decoration: none; font-weight: 600; }
 .checkbox-row a:hover { text-decoration: underline; }
 
 .btn {
   width: 100%;
-  padding: 0.85rem 1rem;
+  min-height: 48px;
+  padding: 0.9rem 1rem;
   border-radius: var(--radius-sm);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   border: none;
   transition: background 0.15s, transform 0.05s, box-shadow 0.15s;
-  margin-top: 0.3rem;
-  /* Minimum thumb-friendly height on phones. */
-  min-height: 44px;
+  margin-top: 0.5rem;
 }
 .btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary { background: var(--green); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--green-dark); box-shadow: 0 2px 8px rgba(22,163,74,0.25); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--green); color: #fff; box-shadow: 0 1px 2px rgba(22,163,74,0.15); }
+.btn-primary:hover:not(:disabled) {
+  background: var(--green-dark);
+  box-shadow: 0 4px 12px rgba(22,163,74,0.25);
+}
 
 .alert {
-  padding: 0.75rem 0.9rem;
+  padding: 0.85rem 1rem;
   border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  line-height: 1.45;
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 .alert-error { background: var(--red-bg); color: #7f1d1d; border: 1px solid var(--red-border); }
-.alert-success { background: var(--green-bg); color: #14532d; }
-.alert-info { background: var(--amber-bg); color: #78350f; }
+.alert-success { background: var(--green-bg); color: #14532d; border: 1px solid #bbf7d0; }
+.alert-info { background: var(--amber-bg); color: #78350f; border: 1px solid #fde68a; }
 .hidden { display: none !important; }
 
 .auth-links {
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
+  margin-top: auto;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
 }
 .auth-links a {
   color: var(--green);
   text-decoration: none;
   font-weight: 600;
-  /* Phones: bigger tap zone */
-  padding: 0.25rem 0;
+  padding: 0.5rem 0;
   display: inline-block;
 }
 .auth-links a:hover { text-decoration: underline; }
 
 .status-icon {
-  font-size: 2.5rem;
+  font-size: 3rem;
   text-align: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   line-height: 1;
 }
 
-/* Password strength */
+/* Password strength meter */
 .strength-meter {
-  height: 3px;
+  height: 4px;
   background: var(--border-light);
   border-radius: 99px;
   overflow: hidden;
-  margin-top: 0.3rem;
+  margin-top: 0.4rem;
 }
 .strength-meter-fill {
   height: 100%;
   width: 0;
   transition: width 0.2s, background 0.2s;
+  border-radius: 99px;
 }
 .strength-label {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
-  margin-top: 0.2rem;
+  margin-top: 0.3rem;
 }
 
 /* ==========================================================
-   Responsive breakpoints
+   TABLET + DESKTOP: the card reappears, centered, with air around it.
+   Starts at 640px which covers tablets in portrait and up.
    ========================================================== */
 
-/* Phones: <= 480px */
-@media (max-width: 480px) {
+@media (min-width: 640px) {
   body {
-    /* No outer padding on the smallest screens — card fills width with
-       a subtle inner breathing room. */
-    padding: 0.5rem;
-    align-items: stretch;
+    /* Airy backdrop: two soft green glows bleed in from corners,
+       nothing too saturated. */
+    background:
+      radial-gradient(60% 60% at 15% 5%, rgba(22,163,74,0.07), transparent 70%),
+      radial-gradient(50% 50% at 85% 95%, rgba(22,163,74,0.05), transparent 70%),
+      var(--bg);
+    /* Vertical centering on larger screens. */
+    justify-content: center;
+    align-items: center;
+    padding: 2.5rem 1.5rem;
   }
+
   .auth-card {
-    /* Full-width on phones, softer shadow since there's no surrounding
-       space to highlight the float. */
-    max-width: 100%;
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-sm);
-    min-height: calc(100dvh - 1rem);
-    display: flex;
-    flex-direction: column;
+    max-width: 460px;
+    flex: 0 0 auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 2.5rem 2.25rem 2rem;
+    /* Multi-layer shadow so the card lifts from the page without a hard edge. */
+    box-shadow:
+      0 1px 2px rgba(0,0,0,0.03),
+      0 8px 24px rgba(0,0,0,0.06),
+      0 20px 48px rgba(0,0,0,0.04);
   }
-  .auth-card > .form {
-    /* Form grows to push links to the bottom on short phones. */
-    flex: 1 0 auto;
+
+  .auth-logo { font-size: 1.65rem; }
+  .auth-subtitle { font-size: 0.95rem; margin-bottom: 1.75rem; }
+  .field input[type="text"],
+  .field input[type="email"],
+  .field input[type="password"] {
+    /* 15px on desktop looks tighter; inputs still comfortable. */
+    font-size: 0.95rem;
+    min-height: 44px;
+    padding: 0.75rem 0.9rem;
   }
+  .btn {
+    font-size: 0.95rem;
+    min-height: 46px;
+    padding: 0.8rem 1rem;
+  }
+  .password-wrap input { padding-right: 2.8rem; }
+  .password-toggle { min-width: 36px; min-height: 36px; }
+  .password-toggle svg { width: 18px; height: 18px; }
   .auth-links {
-    /* Stack vertically if the two links don't fit side by side. */
-    flex-direction: column;
-    align-items: stretch;
-    text-align: center;
-    gap: 0.5rem;
-  }
-  .auth-links a {
-    padding: 0.4rem 0;
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    font-size: 0.88rem;
   }
 }
 
-/* Tiny phones: <= 360px */
-@media (max-width: 360px) {
-  .auth-logo { font-size: 1.3rem; }
-  .auth-subtitle { font-size: 0.82rem; }
-  .field label { font-size: 0.76rem; }
-  .btn { font-size: 0.92rem; padding: 0.8rem 0.9rem; }
+@media (min-width: 1024px) {
+  .auth-card { max-width: 480px; padding: 2.75rem 2.5rem 2.25rem; }
 }
 
-/* Landscape on short phones: hide decorative card min-height to let the
-   user scroll naturally. */
-@media (max-width: 900px) and (max-height: 480px) {
-  body { align-items: flex-start; padding: 1rem; }
-  .auth-card { min-height: 0; animation: none; }
-}
-
-/* Tablets: 481-768px */
-@media (min-width: 481px) and (max-width: 768px) {
-  .auth-card { max-width: 460px; }
+/* Landscape on short phones: let the content scroll normally. */
+@media (max-height: 600px) and (max-width: 900px) {
+  body { justify-content: flex-start; }
+  .auth-card { animation: none; }
 }
 
 /* Respect user motion preferences. */

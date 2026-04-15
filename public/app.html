@@ -82,9 +82,14 @@
         }
 
         .app {
-            max-width: 960px;
+            /* Fluid container: never narrower than the content needs and
+               never wider than 1400px (otherwise dashboards stretch too far
+               apart on 4K monitors). The `min()` takes the smaller of the
+               two limits so narrow windows still fit. */
+            width: 100%;
+            max-width: min(1400px, 96vw);
             margin: 0 auto;
-            padding: 2.5rem 1.5rem 4rem;
+            padding: 2.5rem clamp(1rem, 3vw, 2.5rem) 4rem;
         }
 
         /* Header */
@@ -106,7 +111,12 @@
         /* Summary */
         .summary {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            /* auto-fit lets the cards spread across whatever horizontal
+               space is available. minmax(170px, 1fr) guarantees each card
+               never shrinks below 170px. On 4K screens this puts all 10
+               KPI cards on one line; on 1366px laptops it wraps to 2 rows
+               of 5; on tablets, 2-3 per row; phones, 1-2. */
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
             gap: 0.75rem;
             margin-bottom: 2.5rem;
         }
@@ -375,15 +385,13 @@
         /* Responsive */
         @media (max-width: 700px) {
             .app { padding: 1.5rem 1rem 3rem; }
-            .summary { grid-template-columns: repeat(2, 1fr); }
+            /* .summary grid now uses auto-fit(170px) so it adapts
+               automatically — no explicit column count override needed. */
             .summary-value { font-size: 1rem; }
             .calc-grid { grid-template-columns: 1fr; }
             .opex-grid { grid-template-columns: 1fr; }
             .input-row { flex-direction: column; align-items: stretch; gap: 0.3rem; }
             .input-label { min-width: unset; }
-        }
-        @media (max-width: 420px) {
-            .summary { grid-template-columns: 1fr; }
         }
 
         /* ---- Tab Navigation ---- */
@@ -2273,10 +2281,10 @@
     })();
 </script>
 <!-- Fase 1: server-backed period picker for DRE + FC tabs -->
-<script src="/assets/app-periods.js"></script>
-<script src="/assets/app-period-loader.js"></script>
-<script src="/assets/app-upload.js"></script>
-<script src="/assets/app-edit.js"></script>
-<script src="/assets/app-migrate.js"></script>
+<script src="/assets/app-periods.js?v=2"></script>
+<script src="/assets/app-period-loader.js?v=2"></script>
+<script src="/assets/app-upload.js?v=2"></script>
+<script src="/assets/app-edit.js?v=2"></script>
+<script src="/assets/app-migrate.js?v=2"></script>
 </body>
 </html>
