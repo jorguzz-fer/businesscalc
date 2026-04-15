@@ -108,6 +108,12 @@ export async function seedDefaults(
 /**
  * List categories for a period — but only if the period belongs to user.
  * Returns null when not found / not owned (route -> 404).
+ *
+ * Lazy seed: legacy periods (created before Fase 1.5) and periods where
+ * the user deleted all categories return an empty list. We seed defaults
+ * on the spot so the UI never shows an empty editor for a "should-have-
+ * categories" period. seedDefaults is idempotent (count check inside) so
+ * concurrent requests from the same user don't double-seed.
  */
 export async function listForPeriod(
   userId: string,
@@ -115,13 +121,23 @@ export async function listForPeriod(
 ): Promise<PeriodCategory[] | null> {
   const period = await prisma.period.findFirst({
     where: { id: periodId, userId },
-    select: { id: true },
+    select: { id: true, type: true },
   });
   if (!period) return null;
-  return prisma.periodCategory.findMany({
+  let categories = await prisma.periodCategory.findMany({
     where: { periodId: period.id },
     orderBy: [{ section: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
   });
+  if (categories.length === 0) {
+    await prisma.$transaction(async (tx) => {
+      await seedDefaults(tx, period.id, period.type);
+    });
+    categories = await prisma.periodCategory.findMany({
+      where: { periodId: period.id },
+      orderBy: [{ section: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+  return categories;
 }
 
 export type CreateCategoryInput = {
