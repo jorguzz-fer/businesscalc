@@ -169,9 +169,35 @@
     }, 'Apagar');
     if (!s.activeId) deleteBtn.disabled = true;
 
+    // Secondary upload button — triggers the file input hidden in the
+    // empty state so users can still import XLSX without seeing the
+    // big upload card.
+    const uploadBtn = el('button', {
+      type: 'button',
+      style: {
+        padding: '0.5rem 0.9rem',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-sm)',
+        background: 'var(--bg-input)',
+        color: 'var(--text-secondary)',
+        fontSize: '0.78rem',
+        fontWeight: '500',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+      },
+      title: 'Importar arquivo .xlsx para o período atual',
+      on: {
+        click: () => {
+          const input = document.getElementById(type === 'DRE' ? 'dre-file' : 'fc-file');
+          if (input) input.click();
+        },
+      },
+    }, '⬆ Importar');
+
     wrap.appendChild(label);
     wrap.appendChild(select);
     wrap.appendChild(newBtn);
+    wrap.appendChild(uploadBtn);
     wrap.appendChild(deleteBtn);
     container.appendChild(wrap);
   }
@@ -238,6 +264,21 @@
         console.error('Failed to load ' + type + ' periods', err);
       }
       refresh(type);
+    }
+    // Auto-select most recent period per tab so the dashboard loads
+    // directly on first visit instead of showing the empty state.
+    // API orders by year desc + createdAt desc, so periods[0] IS the
+    // most recent. Fire bc:period-changed so the loader + DRE-sync
+    // modules pick it up.
+    for (const type of ['DRE', 'FC']) {
+      const s = state[type];
+      if (s.periods.length > 0 && !s.activeId) {
+        s.activeId = s.periods[0].id;
+        refresh(type);
+        window.dispatchEvent(new CustomEvent('bc:period-changed', {
+          detail: { type, periodId: s.activeId },
+        }));
+      }
     }
   }
 
