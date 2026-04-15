@@ -485,8 +485,12 @@
    */
   async function moveWindow(type, delta) {
     const state = panelState[type];
-    const newStart = state.windowStart + delta;
-    if (newStart < 0 || newStart > 6) return;
+    // Clamp so the new window fits within 0..(12 - WINDOW_SIZE). If user
+    // starts at 1 (Feb-Jul) and clicks next, delta=+6 yields 7 which
+    // would have been rejected before — now clamps to 6 (Jul-Dez).
+    const maxStart = 12 - WINDOW_SIZE; // = 6
+    const newStart = Math.max(0, Math.min(maxStart, state.windowStart + delta));
+    if (newStart === state.windowStart) return; // already at the edge
     // Flush any pending debounce timers so saves land before re-render.
     const pendingIds = Object.keys(state.saveTimers);
     pendingIds.forEach((id) => {
@@ -542,8 +546,14 @@
     if (!tr) return;
     const cat = state.categories.find((c) => c.id === categoryId);
     if (!cat) return;
+    // CRITICAL: start from the existing 12-month array so months OUTSIDE
+    // the visible 6-month window are preserved. Previously this started
+    // from [0, 0, ...] and only overwrote the 6 visible months, wiping
+    // out saved values in the other 6 months every time the user typed.
+    const monthly = Array.isArray(cat.monthly) && cat.monthly.length === 12
+      ? cat.monthly.slice()
+      : [0,0,0,0,0,0,0,0,0,0,0,0];
     const inputs = tr.querySelectorAll('input[data-month]');
-    const monthly = [0,0,0,0,0,0,0,0,0,0,0,0];
     inputs.forEach((inp) => {
       const m = parseInt(inp.dataset.month, 10);
       if (cat.kind === 'money') monthly[m] = parseBRL(inp.value);
