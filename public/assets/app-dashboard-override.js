@@ -12,6 +12,10 @@
   'use strict';
 
   const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const MONTHS_LONG = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Per-type selected month. -1 = Ano (all 12 months); 0..11 = single month.
+  const filterState = { DRE: -1, FC: -1 };
 
   const DRE_SECTION_ORDER = ['RECEITA', 'DEDUCOES', 'CUSTOS_DIRETOS', 'DESPESAS_OP'];
   const FC_SECTION_ORDER = ['ENTRADAS_FC', 'SAIDAS_FC'];
@@ -67,9 +71,11 @@
   }
 
   /**
-   * Build one table row (category + 12 months + total).
+   * Build one table row. When filterMonth is set (0..11), only that
+   * month column is rendered plus the annual Total; otherwise all 12.
    */
-  function buildRow(label, monthly, { cls = '', indent = true, isNegative = false, isPct = false, denom = null } = {}) {
+  function buildRow(label, monthly, opts = {}) {
+    const { cls = '', indent = true, isNegative = false, isPct = false, denom = null, filterMonth = -1 } = opts;
     const tr = document.createElement('tr');
     if (cls) tr.className = cls;
     const tdL = document.createElement('td');
@@ -77,7 +83,8 @@
     if (indent) tdL.className = 'indent';
     tr.appendChild(tdL);
     const total = sum12(monthly);
-    for (let m = 0; m < 12; m++) {
+    const monthRange = filterMonth >= 0 ? [filterMonth] : [0,1,2,3,4,5,6,7,8,9,10,11];
+    for (const m of monthRange) {
       const td = document.createElement('td');
       let v = Number(monthly?.[m]) || 0;
       if (isPct) {
@@ -101,11 +108,71 @@
     return tr;
   }
 
-  function sectionHeaderRow(label) {
+  /**
+   * Build the month-filter chip bar.
+   * [Ano] [Jan] [Fev] [Mar] ... [Dez]
+   * Click a chip to filter the table to that single month.
+   */
+  function buildFilterBar(type, onChange) {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.35rem;padding:0.6rem 0.9rem;background:var(--bg-card);border:1px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:0.75rem;align-items:center;';
+    const label = document.createElement('span');
+    label.textContent = 'Filtrar mês:';
+    label.style.cssText = 'font-size:0.75rem;color:var(--text-muted);margin-right:0.35rem;font-weight:500;';
+    bar.appendChild(label);
+
+    const selected = filterState[type];
+    const chipStyle = (active) =>
+      'padding:0.35rem 0.75rem;border-radius:99px;font-size:0.75rem;font-weight:' + (active ? '700' : '500') + ';cursor:pointer;font-family:inherit;border:1px solid ' + (active ? 'var(--green)' : 'var(--border)') + ';background:' + (active ? 'var(--green)' : 'var(--bg-card)') + ';color:' + (active ? '#fff' : 'var(--text-secondary)') + ';transition:background 0.12s,color 0.12s;';
+
+    // "Ano" chip (all months)
+    const anoBtn = document.createElement('button');
+    anoBtn.type = 'button';
+    anoBtn.textContent = 'Ano';
+    anoBtn.style.cssText = chipStyle(selected === -1);
+    anoBtn.addEventListener('click', () => onChange(-1));
+    bar.appendChild(anoBtn);
+
+    for (let m = 0; m < 12; m++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = MONTHS[m];
+      btn.title = MONTHS_LONG[m];
+      btn.style.cssText = chipStyle(selected === m);
+      btn.addEventListener('click', () => onChange(m));
+      bar.appendChild(btn);
+    }
+    return bar;
+  }
+
+  /**
+   * Build the thead header row honoring the month filter.
+   * When filterMonth >= 0: Categoria | <MonthLong> | Total
+   * Otherwise: Categoria | Jan..Dez | Total
+   */
+  function buildThead(filterMonth) {
+    const thead = document.createElement('thead');
+    const hrow = document.createElement('tr');
+    const monthHeaders = filterMonth >= 0 ? [MONTHS_LONG[filterMonth]] : MONTHS;
+    ['Categoria', ...monthHeaders, 'Total'].forEach((h) => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      hrow.appendChild(th);
+    });
+    thead.appendChild(hrow);
+    return thead;
+  }
+
+  /**
+   * Section band row. colspan adapts to the filter so the band stretches
+   * edge-to-edge whether we're showing one month or all twelve.
+   */
+  function sectionHeaderRow(label, filterMonth) {
     const tr = document.createElement('tr');
     tr.className = 'section-header';
     const td = document.createElement('td');
-    td.colSpan = 14;
+    // Categoria + (1 month or 12) + Total
+    td.colSpan = (filterMonth >= 0 ? 1 : 12) + 2;
     td.textContent = label;
     tr.appendChild(td);
     return tr;
@@ -114,7 +181,7 @@
   /**
    * Build the dynamic DRE table.
    */
-  function buildDRETable(categories, periodId) {
+  function buildDRETable(categories, periodId, filterMonth = -1) {
     const byId = {};
     for (const c of categories || []) byId[c.id] = c;
     const bySection = {};
@@ -128,59 +195,52 @@
 
     const table = document.createElement('table');
     table.className = 'dre-tbl';
-    const thead = document.createElement('thead');
-    const hrow = document.createElement('tr');
-    ['Categoria', ...MONTHS, 'Total'].forEach((h) => {
-      const th = document.createElement('th');
-      th.textContent = h;
-      hrow.appendChild(th);
-    });
-    thead.appendChild(hrow);
-    table.appendChild(thead);
+    table.appendChild(buildThead(filterMonth));
 
     const tbody = document.createElement('tbody');
+    const fOpt = { filterMonth };
 
     // RECEITA
-    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'RECEITA')));
+    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'RECEITA'), filterMonth));
     const receitaCats = bySection.RECEITA;
     const receitaSum = sumArrays(...receitaCats.map((c) => c.monthly));
-    for (const c of receitaCats) tbody.appendChild(buildRow(c.label, c.monthly));
+    for (const c of receitaCats) tbody.appendChild(buildRow(c.label, c.monthly, fOpt));
 
     // DEDUCOES
     const deducoesCats = bySection.DEDUCOES;
     if (deducoesCats.length > 0) {
-      tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'DEDUCOES')));
+      tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'DEDUCOES'), filterMonth));
       for (const c of deducoesCats) {
-        tbody.appendChild(buildRow(c.label, c.monthly, { isNegative: true }));
+        tbody.appendChild(buildRow(c.label, c.monthly, { ...fOpt, isNegative: true }));
       }
     }
     const deducoesSum = sumArrays(...deducoesCats.map((c) => c.monthly));
     const receitaLiq = subArrays(receitaSum, deducoesSum);
-    tbody.appendChild(buildRow('= Receita Líquida', receitaLiq, { cls: 'calc-row', indent: false }));
+    tbody.appendChild(buildRow('= Receita Líquida', receitaLiq, { ...fOpt, cls: 'calc-row', indent: false }));
 
     // CUSTOS_DIRETOS
     const custosCats = bySection.CUSTOS_DIRETOS;
-    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'CUSTOS_DIRETOS')));
+    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'CUSTOS_DIRETOS'), filterMonth));
     for (const c of custosCats) {
-      tbody.appendChild(buildRow(c.label, c.monthly, { isNegative: true }));
+      tbody.appendChild(buildRow(c.label, c.monthly, { ...fOpt, isNegative: true }));
     }
     const custosSum = sumArrays(...custosCats.map((c) => c.monthly));
     const lucroBruto = subArrays(receitaLiq, custosSum);
-    tbody.appendChild(buildRow('= Lucro Bruto', lucroBruto, { cls: 'calc-row', indent: false }));
-    tbody.appendChild(buildRow('Margem Bruta %', lucroBruto, { cls: 'pct-row', isPct: true, denom: receitaSum }));
+    tbody.appendChild(buildRow('= Lucro Bruto', lucroBruto, { ...fOpt, cls: 'calc-row', indent: false }));
+    tbody.appendChild(buildRow('Margem Bruta %', lucroBruto, { ...fOpt, cls: 'pct-row', isPct: true, denom: receitaSum }));
 
     // DESPESAS_OP
     const despOpCats = bySection.DESPESAS_OP;
-    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'DESPESAS_OP')));
+    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'DESPESAS_OP'), filterMonth));
     for (const c of despOpCats) {
-      tbody.appendChild(buildRow(c.label, c.monthly, { isNegative: true }));
+      tbody.appendChild(buildRow(c.label, c.monthly, { ...fOpt, isNegative: true }));
     }
     const despOpSum = sumArrays(...despOpCats.map((c) => c.monthly));
-    tbody.appendChild(buildRow('= Total Despesas Op', despOpSum, { cls: 'calc-row', indent: false, isNegative: true }));
+    tbody.appendChild(buildRow('= Total Despesas Op', despOpSum, { ...fOpt, cls: 'calc-row', indent: false, isNegative: true }));
 
     const resultadoLiq = subArrays(lucroBruto, despOpSum);
-    tbody.appendChild(buildRow('= RESULTADO LÍQUIDO', resultadoLiq, { cls: 'resultado-row', indent: false }));
-    tbody.appendChild(buildRow('Margem Líquida %', resultadoLiq, { cls: 'pct-row', isPct: true, denom: receitaSum }));
+    tbody.appendChild(buildRow('= RESULTADO LÍQUIDO', resultadoLiq, { ...fOpt, cls: 'resultado-row', indent: false }));
+    tbody.appendChild(buildRow('Margem Líquida %', resultadoLiq, { ...fOpt, cls: 'pct-row', isPct: true, denom: receitaSum }));
 
     table.appendChild(tbody);
     return table;
@@ -189,7 +249,7 @@
   /**
    * Build the dynamic FC table.
    */
-  function buildFCTable(categories, periodId) {
+  function buildFCTable(categories, periodId, filterMonth = -1) {
     const bySection = { ENTRADAS_FC: [], SAIDAS_FC: [] };
     for (const c of categories || []) {
       if (bySection[c.section]) bySection[c.section].push(c);
@@ -199,23 +259,16 @@
 
     const table = document.createElement('table');
     table.className = 'dre-tbl';
-    const thead = document.createElement('thead');
-    const hrow = document.createElement('tr');
-    ['Categoria', ...MONTHS, 'Total'].forEach((h) => {
-      const th = document.createElement('th');
-      th.textContent = h;
-      hrow.appendChild(th);
-    });
-    thead.appendChild(hrow);
-    table.appendChild(thead);
+    table.appendChild(buildThead(filterMonth));
 
     const tbody = document.createElement('tbody');
-    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'ENTRADAS_FC')));
-    for (const c of bySection.ENTRADAS_FC) tbody.appendChild(buildRow(c.label, c.monthly));
+    const fOpt = { filterMonth };
+    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'ENTRADAS_FC'), filterMonth));
+    for (const c of bySection.ENTRADAS_FC) tbody.appendChild(buildRow(c.label, c.monthly, fOpt));
 
-    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'SAIDAS_FC')));
+    tbody.appendChild(sectionHeaderRow(sectionTitleFor(periodId, 'SAIDAS_FC'), filterMonth));
     for (const c of bySection.SAIDAS_FC) {
-      tbody.appendChild(buildRow(c.label, c.monthly, { isNegative: true }));
+      tbody.appendChild(buildRow(c.label, c.monthly, { ...fOpt, isNegative: true }));
     }
 
     // Totals.
@@ -226,8 +279,8 @@
     const entradas = sumArrays(...moneyInflows);
     const saidas = sumArrays(...bySection.SAIDAS_FC.map((c) => c.monthly));
     const saldo = subArrays(entradas, saidas);
-    tbody.appendChild(buildRow('= Total Saídas', saidas, { cls: 'calc-row', indent: false, isNegative: true }));
-    tbody.appendChild(buildRow('= SALDO', saldo, { cls: 'resultado-row', indent: false }));
+    tbody.appendChild(buildRow('= Total Saídas', saidas, { ...fOpt, cls: 'calc-row', indent: false, isNegative: true }));
+    tbody.appendChild(buildRow('= SALDO', saldo, { ...fOpt, cls: 'resultado-row', indent: false }));
 
     table.appendChild(tbody);
     return table;
@@ -235,6 +288,8 @@
 
   /**
    * After the v1 renderers finish their DOM, swap the table.
+   * Also inserts the month-filter chip bar above the table so the user
+   * can zoom into a single month without scrolling 12 columns.
    */
   async function overrideTables() {
     if (!window.bcPeriods) return;
@@ -251,10 +306,16 @@
           type === 'DRE' ? 'dre-table-container' : 'fc-table-container',
         );
         if (!container) continue;
+        const filterMonth = filterState[type];
+        const filterBar = buildFilterBar(type, (m) => {
+          filterState[type] = m;
+          overrideTables();
+        });
         const fresh = type === 'DRE'
-          ? buildDRETable(cats, active.id)
-          : buildFCTable(cats, active.id);
+          ? buildDRETable(cats, active.id, filterMonth)
+          : buildFCTable(cats, active.id, filterMonth);
         container.innerHTML = '';
+        container.appendChild(filterBar);
         container.appendChild(fresh);
       } catch (err) {
         // non-blocking; v1 fallback is still on screen
