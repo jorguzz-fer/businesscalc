@@ -2,14 +2,12 @@
  * Bridges the new dynamic-categories API to the existing v1 SPA dashboard
  * renderers (renderDREDashboard / renderFCDashboard).
  *
- * The v1 renderers expect a flat object keyed by hardcoded category names
- * (receita, deducoes, cmv, etc). Now categories are user-defined and live
- * under section enums (RECEITA, CUSTOS_DIRETOS, ...).
- *
- * Strategy: collapse categories by section into the v1-compatible keys.
- * Per-category granularity is preserved in the EDIT panel; the dashboard
- * shows section-level totals + the server's computed values (which are
- * already section-aware, so totals/lucro/margens stay accurate).
+ * Strategy: instead of collapsing by SECTION (which put every expense
+ * under the "pessoal" slot and left the other rows empty), we match each
+ * category's LABEL to the v1 key regex. Custom/renamed categories that
+ * don't match any known pattern fall into the section's catch-all key
+ * (diversas for DESPESAS_OP, outrosCustos for CUSTOS_DIRETOS) so their
+ * values still reach the dashboard totals.
  */
 (function () {
   'use strict';
@@ -17,46 +15,76 @@
   function q(id) { return document.getElementById(id); }
   const ZEROS = () => [0,0,0,0,0,0,0,0,0,0,0,0];
 
-  // sum many monthly arrays element-wise.
-  function sum12(arrays) {
-    const out = ZEROS();
-    for (const a of arrays) {
-      if (!Array.isArray(a)) continue;
-      for (let i = 0; i < 12; i++) out[i] += (Number(a[i]) || 0);
-    }
-    return out;
+  /**
+   * Accumulate a category's monthly array into a target monthly under
+   * the same v1 key. Multiple matching categories sum (allows users who
+   * added a "Pessoal - PJ" alongside "Pessoal (CLT)" to both go into
+   * the pessoal slot without one overwriting the other).
+   */
+  function accum(target, monthly) {
+    if (!Array.isArray(monthly)) return;
+    for (let i = 0; i < 12; i++) target[i] += Number(monthly[i]) || 0;
   }
 
-  function bySection(categories) {
-    const map = { RECEITA: [], DEDUCOES: [], CUSTOS_DIRETOS: [], DESPESAS_OP: [], ENTRADAS_FC: [], SAIDAS_FC: [] };
-    for (const c of categories || []) {
-      if (map[c.section]) map[c.section].push(c);
-    }
-    return map;
-  }
+  // Label -> v1 slot regex. Order matters: the FIRST matching regex wins
+  // for a given category, so more-specific patterns come first.
+  const DRE_KEY_RX = [
+    ['receita',      /receita/i],
+    ['deducoes',     /dedu/i],
+    ['cmv',          /cmv|log[íi]stica/i],
+    ['equipamentos', /equipamentos/i],
+    ['provisao',     /provis[ãa]o|manuten[çc][ãa]o\s*maq/i],
+    ['outrosCustos', /outros\s*custos/i],
+    // Despesas operacionais:
+    ['inss',         /inss|fgts/i],
+    ['beneficios',   /benef/i],
+    ['proLabore',    /pr[óo]-?labore/i],
+    ['ferias',       /f[ée]rias|13/i],
+    ['aluguel',      /aluguel/i],
+    ['marketing',    /marketing/i],
+    ['ti',           /\bti\b|tecnologia/i],
+    ['manutPredial', /manuten[çc][ãa]o.*predial/i],
+    ['exames',       /exame|sa[úu]de/i],
+    ['despFin',      /financ/i],
+    ['pessoal',      /pessoal|sal[áa]rio/i],
+    ['diversas',     /diversas/i],
+  ];
+
+  // Section -> catchall v1 key for custom/renamed items that match
+  // nothing in DRE_KEY_RX. Keeps their values in the totals.
+  const DRE_SECTION_FALLBACK = {
+    RECEITA: 'receita',
+    DEDUCOES: 'deducoes',
+    CUSTOS_DIRETOS: 'outrosCustos',
+    DESPESAS_OP: 'diversas',
+  };
 
   function toDREDashboardData(apiResp, metas) {
     const c = apiResp.computed || {};
-    const sec = bySection(apiResp.categories);
-    // For the v1 renderer's DRE table & donut, expose section-level sums
-    // under the legacy property names. A single "cmv" key holding the sum
-    // of CUSTOS_DIRETOS preserves the chart shape; the EDIT panel shows
-    // per-item granularity for editing.
-    const cmvSum = sum12(sec.CUSTOS_DIRETOS.map((x) => x.monthly));
-    const despOpSum = sum12(sec.DESPESAS_OP.map((x) => x.monthly));
-    return {
-      // Inputs (collapsed by section).
-      receita: sum12(sec.RECEITA.map((x) => x.monthly)),
-      deducoes: sum12(sec.DEDUCOES.map((x) => x.monthly)),
-      cmv: cmvSum,
-      // Other CUSTOS_DIRETOS items go to zero so the donut doesn't double-count.
-      outrosCustos: ZEROS(), equipamentos: ZEROS(), provisao: ZEROS(),
-      pessoal: despOpSum,
-      // Other DESPESAS_OP go zero to avoid double-counting.
-      beneficios: ZEROS(), inss: ZEROS(), proLabore: ZEROS(), ferias: ZEROS(),
+    const d = {
+      receita: ZEROS(), deducoes: ZEROS(),
+      cmv: ZEROS(), outrosCustos: ZEROS(), equipamentos: ZEROS(), provisao: ZEROS(),
+      pessoal: ZEROS(), beneficios: ZEROS(), inss: ZEROS(), proLabore: ZEROS(), ferias: ZEROS(),
       aluguel: ZEROS(), marketing: ZEROS(), ti: ZEROS(), diversas: ZEROS(),
       manutPredial: ZEROS(), exames: ZEROS(), despFin: ZEROS(),
-      // Computed (server-authoritative).
+    };
+    for (const cat of apiResp.categories || []) {
+      let matched = false;
+      for (const [key, rx] of DRE_KEY_RX) {
+        if (rx.test(cat.label) && d[key]) {
+          accum(d[key], cat.monthly);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        const fallback = DRE_SECTION_FALLBACK[cat.section];
+        if (fallback && d[fallback]) accum(d[fallback], cat.monthly);
+      }
+    }
+    // Server-authoritative computed values flow through unchanged.
+    return {
+      ...d,
       receitaLiq: c.receitaLiquida || ZEROS(),
       custosDiretos: c.custosDiretos || ZEROS(),
       lucroBruto: c.lucroBruto || ZEROS(),
@@ -69,23 +97,48 @@
     };
   }
 
+  // FC uses the same expense keys as DRE for the "saídas" side, plus
+  // pedidos / ticketMedio / receita on the inflow side.
+  const FC_INFLOW_RX = [
+    ['pedidos',     /pedido/i],
+    ['ticketMedio', /ticket/i],
+    ['receita',     /receita|venda/i],
+  ];
+
   function toFCDashboardData(apiResp) {
     const c = apiResp.computed || {};
-    const sec = bySection(apiResp.categories);
-    // Identify the receita line in ENTRADAS_FC by money kind + label match.
-    const receitaCat = sec.ENTRADAS_FC.find((x) => /receita|vendas/i.test(x.label));
-    const pedidosCat = sec.ENTRADAS_FC.find((x) => x.kind === 'count');
-    const ticketCat = sec.ENTRADAS_FC.find((x) => /ticket/i.test(x.label));
-    const saidasSum = sum12(sec.SAIDAS_FC.map((x) => x.monthly));
+    const d = {
+      receita: ZEROS(), pedidos: ZEROS(), ticketMedio: ZEROS(),
+      cmv: ZEROS(), outrosCustos: ZEROS(), equipamentos: ZEROS(), provisao: ZEROS(),
+      pessoal: ZEROS(), beneficios: ZEROS(), inss: ZEROS(), proLabore: ZEROS(), ferias: ZEROS(),
+      aluguel: ZEROS(), marketing: ZEROS(), ti: ZEROS(), diversas: ZEROS(),
+      manutPredial: ZEROS(), exames: ZEROS(), despFin: ZEROS(),
+    };
+    for (const cat of apiResp.categories || []) {
+      if (cat.section === 'ENTRADAS_FC') {
+        let matched = false;
+        for (const [key, rx] of FC_INFLOW_RX) {
+          if (rx.test(cat.label) && d[key]) {
+            accum(d[key], cat.monthly);
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) accum(d.receita, cat.monthly);
+      } else if (cat.section === 'SAIDAS_FC') {
+        let matched = false;
+        for (const [key, rx] of DRE_KEY_RX) {
+          if (rx.test(cat.label) && d[key]) {
+            accum(d[key], cat.monthly);
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) accum(d.diversas, cat.monthly);
+      }
+    }
     return {
-      receita: receitaCat?.monthly || ZEROS(),
-      pedidos: pedidosCat?.monthly || ZEROS(),
-      ticketMedio: ticketCat?.monthly || ZEROS(),
-      cmv: saidasSum, // collapse all saídas under cmv for the v1 donut
-      outrosCustos: ZEROS(), equipamentos: ZEROS(), provisao: ZEROS(),
-      pessoal: ZEROS(), beneficios: ZEROS(), inss: ZEROS(), proLabore: ZEROS(),
-      ferias: ZEROS(), aluguel: ZEROS(), marketing: ZEROS(), ti: ZEROS(),
-      diversas: ZEROS(), manutPredial: ZEROS(), exames: ZEROS(), despFin: ZEROS(),
+      ...d,
       totalSaidas: c.saidas || ZEROS(),
       saldo: c.saldo || ZEROS(),
     };

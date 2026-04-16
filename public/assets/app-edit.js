@@ -80,10 +80,19 @@
   }
 
   // ---------- state ----------
-  const panelState = {
-    DRE: { open: false, periodId: null, categories: [], finalizado: false, saveTimers: {}, lastSavedAt: null },
-    FC:  { open: false, periodId: null, categories: [], finalizado: false, saveTimers: {}, lastSavedAt: null },
+  // windowStart is the index (0-6) of the first month in the visible
+  // 6-month window. Default centers the current calendar month so the
+  // user doesn't have to navigate on first open for most scenarios.
+  const defaultWindowStart = () => {
+    const m = new Date().getMonth(); // 0..11
+    return Math.max(0, Math.min(6, m - 2));
   };
+  const panelState = {
+    DRE: { open: false, periodId: null, categories: [], finalizado: false, saveTimers: {}, lastSavedAt: null, windowStart: defaultWindowStart() },
+    FC:  { open: false, periodId: null, categories: [], finalizado: false, saveTimers: {}, lastSavedAt: null, windowStart: defaultWindowStart() },
+  };
+  const WINDOW_SIZE = 6;
+  const CURRENT_MONTH = new Date().getMonth(); // for highlight
 
   // ---------- toggle button on the period bar ----------
   function ensureToggleButton(type) {
@@ -173,9 +182,9 @@
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.textContent = 'Fechar';
-    closeBtn.style.cssText = 'padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);cursor:pointer;font-size:0.78rem;font-family:inherit;';
-    closeBtn.addEventListener('click', () => togglePanel(type));
+    closeBtn.textContent = '✓ Salvar';
+    closeBtn.style.cssText = 'padding:0.45rem 1.1rem;border:none;border-radius:var(--radius-sm);background:var(--green);color:#fff;cursor:pointer;font-size:0.82rem;font-weight:700;font-family:inherit;';
+    closeBtn.addEventListener('click', () => saveAndClose(type));
     right.appendChild(closeBtn);
     header.appendChild(right);
     panel.appendChild(header);
@@ -241,6 +250,37 @@
     // Stable sort by sortOrder.
     for (const s of sectionOrder) bySection[s].sort((a, b) => a.sortOrder - b.sortOrder);
 
+    // Month window navigator (only 6 months shown at a time — full 12
+    // columns was too wide for laptop screens).
+    const start = state.windowStart;
+    const end = Math.min(start + WINDOW_SIZE, 12);
+    const visibleMonths = MONTHS.slice(start, end);
+
+    const nav = document.createElement('div');
+    nav.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;gap:0.5rem;';
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.textContent = '‹ Anterior';
+    prevBtn.disabled = start === 0;
+    prevBtn.style.cssText = 'padding:0.4rem 0.8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:' + (start === 0 ? 'var(--text-muted)' : 'var(--text)') + ';font-size:0.78rem;font-family:inherit;cursor:' + (start === 0 ? 'not-allowed' : 'pointer') + ';opacity:' + (start === 0 ? '0.5' : '1') + ';';
+    prevBtn.addEventListener('click', () => moveWindow(type, -WINDOW_SIZE));
+
+    const rangeLabel = document.createElement('span');
+    rangeLabel.style.cssText = 'font-size:0.82rem;font-weight:600;color:var(--text-secondary);font-family:"Space Mono",monospace;';
+    rangeLabel.textContent = visibleMonths[0] + ' – ' + visibleMonths[visibleMonths.length - 1];
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.textContent = 'Próximo ›';
+    nextBtn.disabled = end >= 12;
+    nextBtn.style.cssText = 'padding:0.4rem 0.8rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:' + (end >= 12 ? 'var(--text-muted)' : 'var(--text)') + ';font-size:0.78rem;font-family:inherit;cursor:' + (end >= 12 ? 'not-allowed' : 'pointer') + ';opacity:' + (end >= 12 ? '0.5' : '1') + ';';
+    nextBtn.addEventListener('click', () => moveWindow(type, WINDOW_SIZE));
+
+    nav.appendChild(prevBtn);
+    nav.appendChild(rangeLabel);
+    nav.appendChild(nextBtn);
+    panel.appendChild(nav);
+
     const wrap = document.createElement('div');
     wrap.style.cssText = 'overflow-x:auto;';
     const table = document.createElement('table');
@@ -252,10 +292,12 @@
     catTh.textContent = 'Categoria';
     catTh.style.cssText = 'position:sticky;left:0;background:var(--bg);padding:0.5rem 0.75rem;text-align:left;font-size:0.7rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border);min-width:240px;';
     hrow.appendChild(catTh);
-    MONTHS.forEach((m) => {
+    visibleMonths.forEach((m, idx) => {
+      const monthIdx = start + idx;
       const th = document.createElement('th');
       th.textContent = m;
-      th.style.cssText = 'padding:0.5rem 0.4rem;text-align:right;font-size:0.7rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border);font-family:"Space Mono",monospace;min-width:90px;';
+      const isCurrent = monthIdx === CURRENT_MONTH;
+      th.style.cssText = 'padding:0.5rem 0.4rem;text-align:right;font-size:0.72rem;font-weight:' + (isCurrent ? '800' : '600') + ';color:' + (isCurrent ? 'var(--green)' : 'var(--text-secondary)') + ';border-bottom:' + (isCurrent ? '2px solid var(--green)' : '1px solid var(--border)') + ';font-family:"Space Mono",monospace;min-width:130px;';
       hrow.appendChild(th);
     });
     // Last column: actions (delete button)
@@ -271,7 +313,7 @@
       // Section header row (editable label)
       const secRow = document.createElement('tr');
       const secTd = document.createElement('td');
-      secTd.colSpan = 14;
+      secTd.colSpan = WINDOW_SIZE + 2;
       secTd.style.cssText = 'background:var(--bg);padding:0.6rem 0.75rem;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;color:var(--text-muted);text-transform:uppercase;';
       secTd.textContent = getSectionTitle(state.periodId, section);
       if (!state.finalizado) {
@@ -290,7 +332,7 @@
       if (!state.finalizado) {
         const addRow = document.createElement('tr');
         const addTd = document.createElement('td');
-        addTd.colSpan = 14;
+        addTd.colSpan = WINDOW_SIZE + 2;
         addTd.style.cssText = 'padding:0.4rem 0.75rem;background:var(--bg-card);';
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
@@ -305,6 +347,25 @@
     table.appendChild(tbody);
     wrap.appendChild(table);
     panel.appendChild(wrap);
+
+    // Bottom Salvar bar — same behavior as the top button, positioned so
+    // the user doesn't have to scroll back up after filling a long section.
+    if (!state.finalizado) {
+      const footer = document.createElement('div');
+      footer.style.cssText = 'display:flex;justify-content:flex-end;padding-top:1.25rem;margin-top:1rem;border-top:1px solid var(--border-light);gap:0.75rem;align-items:center;';
+      const footerStatus = document.createElement('span');
+      footerStatus.id = type + '-edit-status-footer';
+      footerStatus.style.cssText = 'font-size:0.78rem;color:var(--text-muted);margin-right:auto;';
+      const bottomSave = document.createElement('button');
+      bottomSave.type = 'button';
+      bottomSave.textContent = '✓ Salvar';
+      bottomSave.style.cssText = 'padding:0.6rem 1.4rem;border:none;border-radius:var(--radius-sm);background:var(--green);color:#fff;cursor:pointer;font-size:0.88rem;font-weight:700;font-family:inherit;';
+      bottomSave.addEventListener('click', () => saveAndClose(type));
+      footer.appendChild(footerStatus);
+      footer.appendChild(bottomSave);
+      panel.appendChild(footer);
+    }
+
     updateStatus(type, state.finalizado ? 'Read-only' : 'Pronto');
   }
 
@@ -333,9 +394,16 @@
     tr.appendChild(tdL);
 
     const monthly = Array.isArray(cat.monthly) ? cat.monthly : [0,0,0,0,0,0,0,0,0,0,0,0];
-    for (let m = 0; m < 12; m++) {
+    // Only render the 6 months inside the current window. doSave still
+    // collects the full 12-element array by reading from cat.monthly
+    // (updated live via onInput below) so months outside the window
+    // are preserved across navigations.
+    const start = state.windowStart;
+    const end = Math.min(start + WINDOW_SIZE, 12);
+    for (let m = start; m < end; m++) {
       const td = document.createElement('td');
-      td.style.cssText = 'padding:0.25rem;border-bottom:1px solid var(--border-light);';
+      const isCurrent = m === CURRENT_MONTH;
+      td.style.cssText = 'padding:0.25rem;border-bottom:1px solid var(--border-light);' + (isCurrent ? 'background:rgba(22,163,74,0.04);' : '');
       const input = document.createElement('input');
       input.type = 'text';
       input.dataset.month = String(m);
@@ -344,10 +412,17 @@
         : (monthly[m] ? String(Math.round(monthly[m])) : '');
       input.placeholder = '0';
       input.disabled = state.finalizado;
-      input.style.cssText = 'width:100%;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:6px;font-family:"Space Mono",monospace;font-size:0.8rem;background:var(--bg-input);outline:none;text-align:right;';
+      input.style.cssText = 'width:100%;padding:0.35rem 0.4rem;border:' + (isCurrent ? '1.5px solid var(--green)' : '1px solid var(--border)') + ';border-radius:6px;font-family:"Space Mono",monospace;font-size:0.78rem;background:var(--bg-input);outline:none;text-align:right;min-width:0;';
       if (cat.kind === 'money') bindMoneyMask(input);
       else input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, ''); });
-      input.addEventListener('input', () => scheduleSave(type, cat.id));
+      // Also mirror the typed value into cat.monthly in real time so
+      // window-switching keeps unsaved edits.
+      input.addEventListener('input', () => {
+        const idx = parseInt(input.dataset.month, 10);
+        cat.monthly = cat.monthly || [0,0,0,0,0,0,0,0,0,0,0,0];
+        cat.monthly[idx] = cat.kind === 'money' ? parseBRL(input.value) : (input.value ? parseInt(input.value, 10) || 0 : 0);
+        scheduleSave(type, cat.id);
+      });
       input.addEventListener('focus', () => input.select());
       td.appendChild(input);
       tr.appendChild(td);
@@ -392,10 +467,68 @@
   }
 
   function updateStatus(type, text, isError) {
-    const el = document.getElementById(type + '-edit-status');
-    if (!el) return;
-    el.textContent = text;
-    el.style.color = isError ? 'var(--red)' : 'var(--text-muted)';
+    [type + '-edit-status', type + '-edit-status-footer'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = isError ? 'var(--red)' : 'var(--text-muted)';
+    });
+  }
+
+  /**
+   * Flush any pending debounced saves, then close the panel.
+   * Called by both the top-right and bottom Salvar buttons.
+   */
+  /**
+   * Navigate the month window by +6 or -6. Flushes pending autosaves
+   * first so state.categories is up-to-date before the re-render.
+   */
+  async function moveWindow(type, delta) {
+    const state = panelState[type];
+    // Clamp so the new window fits within 0..(12 - WINDOW_SIZE). If user
+    // starts at 1 (Feb-Jul) and clicks next, delta=+6 yields 7 which
+    // would have been rejected before — now clamps to 6 (Jul-Dez).
+    const maxStart = 12 - WINDOW_SIZE; // = 6
+    const newStart = Math.max(0, Math.min(maxStart, state.windowStart + delta));
+    if (newStart === state.windowStart) return; // already at the edge
+    // Flush any pending debounce timers so saves land before re-render.
+    const pendingIds = Object.keys(state.saveTimers);
+    pendingIds.forEach((id) => {
+      clearTimeout(state.saveTimers[id]);
+      delete state.saveTimers[id];
+    });
+    if (pendingIds.length > 0) {
+      updateStatus(type, 'Salvando...');
+      try { await Promise.all(pendingIds.map((id) => doSave(type, id))); }
+      catch (_e) { /* status already updated on error */ }
+    }
+    state.windowStart = newStart;
+    renderPanel(type);
+  }
+
+  async function saveAndClose(type) {
+    const state = panelState[type];
+    const pendingIds = Object.keys(state.saveTimers);
+    // Cancel the debounce timers so they don't fire again after we
+    // trigger the save here.
+    pendingIds.forEach((id) => {
+      clearTimeout(state.saveTimers[id]);
+      delete state.saveTimers[id];
+    });
+    if (pendingIds.length > 0) {
+      updateStatus(type, 'Salvando...');
+      try {
+        await Promise.all(pendingIds.map((id) => doSave(type, id)));
+      } catch (_e) { /* doSave already updates status on error */ }
+    }
+    // Toggle closes and reopens dashboard via bcPeriodLoader.
+    state.open = false;
+    const panel = ensurePanelContainer(type);
+    if (panel) panel.style.display = 'none';
+    const active = window.bcPeriods?.getActive(type);
+    if (active && window.bcPeriodLoader) {
+      await window.bcPeriodLoader.loadAndRender(type, active.id);
+    }
   }
 
   // ---------- per-cell autosave ----------
@@ -413,8 +546,14 @@
     if (!tr) return;
     const cat = state.categories.find((c) => c.id === categoryId);
     if (!cat) return;
+    // CRITICAL: start from the existing 12-month array so months OUTSIDE
+    // the visible 6-month window are preserved. Previously this started
+    // from [0, 0, ...] and only overwrote the 6 visible months, wiping
+    // out saved values in the other 6 months every time the user typed.
+    const monthly = Array.isArray(cat.monthly) && cat.monthly.length === 12
+      ? cat.monthly.slice()
+      : [0,0,0,0,0,0,0,0,0,0,0,0];
     const inputs = tr.querySelectorAll('input[data-month]');
-    const monthly = [0,0,0,0,0,0,0,0,0,0,0,0];
     inputs.forEach((inp) => {
       const m = parseInt(inp.dataset.month, 10);
       if (cat.kind === 'money') monthly[m] = parseBRL(inp.value);
